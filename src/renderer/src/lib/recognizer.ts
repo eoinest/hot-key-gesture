@@ -13,7 +13,8 @@ export async function createGestureRecognizer(): Promise<GestureRecognizer> {
       delegate,
     },
     runningMode: 'VIDEO' as const,
-    numHands: 1,
+    // Two hands: one can arm the safety guard while the other acts.
+    numHands: 2,
   })
   try {
     return await GestureRecognizer.createFromOptions(fileset, options('GPU'))

@@ -8,6 +8,7 @@ import { CameraPanel } from './components/CameraPanel'
 import { GuidePanel } from './components/GuidePanel'
 import { MappingsPanel } from './components/MappingsPanel'
 import { SettingsPanel } from './components/SettingsPanel'
+import { playBoop, playErrorTone } from './lib/sound'
 import { useGesturePipeline } from './lib/useGesturePipeline'
 
 type Tab = 'gestures' | 'guide' | 'settings' | 'activity'
@@ -89,11 +90,18 @@ export default function App() {
     return () => navigator.mediaDevices.removeEventListener('devicechange', refreshDevices)
   }, [refreshDevices])
 
+  const soundRef = useRef({ enabled: true, volume: 0.3 })
+  useEffect(() => {
+    if (config) soundRef.current = config.sound
+  }, [config])
+
   const handleFired = useCallback(
     (mapping: GestureMapping, mode: AppMode) => {
       const info = GESTURE_INFO[mapping.gesture]
       const combo = formatHotkey(mapping.hotkey, platform)
+      const { enabled, volume } = soundRef.current
       if (mode === 'test') {
+        if (enabled) playBoop(volume)
         addLog('test', `${info?.emoji ?? ''} ${info?.label ?? mapping.gesture} → ${combo} (test — not sent)`)
         return
       }
@@ -101,8 +109,10 @@ export default function App() {
         .sendHotkey({ hotkey: mapping.hotkey, gesture: mapping.gesture, mappingId: mapping.id })
         .then((result) => {
           if (result.ok) {
+            if (enabled) playBoop(volume)
             addLog('live', `${info?.emoji ?? ''} ${info?.label ?? mapping.gesture} → sent ${combo}`)
           } else {
+            if (enabled) playErrorTone(volume)
             addLog('error', `Failed to send ${combo}: ${result.error}`)
           }
         })
@@ -143,6 +153,10 @@ export default function App() {
   if (!config) {
     return <div className="app-loading">Loading…</div>
   }
+
+  const armInfo = GESTURE_INFO[config.engine.armGesture]
+  const armGestureLabel = armInfo?.label ?? config.engine.armGesture
+  const armGestureEmoji = armInfo?.emoji ?? '✊'
 
   return (
     <div className="app">
@@ -186,6 +200,9 @@ export default function App() {
             flashToken={pipeline.flashToken}
             cameraError={pipeline.cameraError}
             recognizerStatus={pipeline.recognizerStatus}
+            requireArmHand={config.engine.requireArmHand}
+            armGestureLabel={armGestureLabel}
+            armGestureEmoji={armGestureEmoji}
             onRetryCamera={pipeline.restartCamera}
           />
         </section>
@@ -211,17 +228,32 @@ export default function App() {
                 mappings={config.mappings}
                 stable={pipeline.hud.stable}
                 platform={platform}
+                requireArmHand={config.engine.requireArmHand}
+                armGestureLabel={armGestureLabel}
+                armGestureEmoji={armGestureEmoji}
                 onChange={(mappings) => setConfig({ ...config, mappings })}
               />
             )}
-            {tab === 'guide' && <GuidePanel stable={pipeline.hud.stable} />}
+            {tab === 'guide' && (
+              <GuidePanel
+                stable={pipeline.hud.stable}
+                requireArmHand={config.engine.requireArmHand}
+                armGestureLabel={armGestureLabel}
+                armGestureEmoji={armGestureEmoji}
+                holdMs={config.engine.holdMs}
+                cooldownMs={config.engine.cooldownMs}
+                repeats={!config.engine.requireRelease}
+              />
+            )}
             {tab === 'settings' && (
               <SettingsPanel
                 engine={config.engine}
                 camera={config.camera}
+                sound={config.sound}
                 devices={devices}
                 onEngineChange={(engine) => setConfig({ ...config, engine })}
                 onCameraChange={(camera) => setConfig({ ...config, camera })}
+                onSoundChange={(sound) => setConfig({ ...config, sound })}
               />
             )}
             {tab === 'activity' && <ActivityPanel logs={logs} onClear={() => setLogs([])} />}

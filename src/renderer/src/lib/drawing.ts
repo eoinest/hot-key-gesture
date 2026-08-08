@@ -15,6 +15,10 @@ const FINGERTIPS = [4, 8, 12, 16, 20]
 const ACCENT = '#8b9dff'
 const ACCENT_SOFT = 'rgba(139, 157, 255, 0.55)'
 const FIRED = '#4ade80'
+const ARM = '#fbbf24'
+const ARM_SOFT = 'rgba(251, 191, 36, 0.5)'
+const IDLE_HAND = '#6b7280'
+const IDLE_HAND_SOFT = 'rgba(107, 114, 128, 0.45)'
 
 interface Mapped {
   x: number
@@ -52,12 +56,14 @@ function makeMapper(
 }
 
 /**
- * Draw the hand skeleton plus a hold-progress arc around the hand.
+ * Draw every detected hand, colored by its role (amber = arming the safety
+ * guard, accent = acting, grey = neither), plus a hold-progress arc around
+ * the acting hand.
  */
 export function drawOverlay(
   canvas: HTMLCanvasElement,
   video: HTMLVideoElement,
-  landmarks: Point3[] | null,
+  hands: Point3[][],
   mirror: boolean,
   engine: EngineFrameResult,
   showProgress: boolean,
@@ -75,31 +81,49 @@ export function drawOverlay(
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, elemW, elemH)
 
-  if (!landmarks || landmarks.length < 21 || !video.videoWidth) return
+  if (!hands.length || !video.videoWidth) return
 
   const map = makeMapper(video.videoWidth, video.videoHeight, elemW, elemH, mirror)
-  const pts = landmarks.map(map)
+  let actionPts: Mapped[] | null = null
 
-  ctx.lineWidth = 3
-  ctx.lineCap = 'round'
-  ctx.strokeStyle = ACCENT_SOFT
-  for (const [a, b] of HAND_CONNECTIONS) {
-    ctx.beginPath()
-    ctx.moveTo(pts[a].x, pts[a].y)
-    ctx.lineTo(pts[b].x, pts[b].y)
-    ctx.stroke()
-  }
+  hands.forEach((landmarks, handIndex) => {
+    if (!landmarks || landmarks.length < 21) return
+    const pts = landmarks.map(map)
+    const isArm = handIndex === engine.armHandIndex
+    const isAction = handIndex === engine.actionHandIndex
+    if (isAction) actionPts = pts
 
-  ctx.fillStyle = ACCENT
-  for (let i = 0; i < pts.length; i++) {
-    ctx.beginPath()
-    ctx.arc(pts[i].x, pts[i].y, FINGERTIPS.includes(i) ? 5 : 3, 0, Math.PI * 2)
-    ctx.fill()
-  }
+    ctx.lineWidth = 3
+    ctx.lineCap = 'round'
+    ctx.strokeStyle = isArm ? ARM_SOFT : isAction ? ACCENT_SOFT : IDLE_HAND_SOFT
+    for (const [a, b] of HAND_CONNECTIONS) {
+      ctx.beginPath()
+      ctx.moveTo(pts[a].x, pts[a].y)
+      ctx.lineTo(pts[b].x, pts[b].y)
+      ctx.stroke()
+    }
 
-  if (!showProgress || engine.state === 'idle') return
+    ctx.fillStyle = isArm ? ARM : isAction ? ACCENT : IDLE_HAND
+    for (let i = 0; i < pts.length; i++) {
+      ctx.beginPath()
+      ctx.arc(pts[i].x, pts[i].y, FINGERTIPS.includes(i) ? 5 : 3, 0, Math.PI * 2)
+      ctx.fill()
+    }
 
-  // Hold-progress ring centered on the hand.
+    if (isArm) {
+      // Label the arming hand so the guard is visible, not just implied.
+      const top = pts.reduce((a, p) => (p.y < a.y ? p : a), pts[0])
+      ctx.fillStyle = ARM
+      ctx.font = 'bold 13px system-ui'
+      ctx.textAlign = 'center'
+      ctx.fillText('ARMED', top.x, top.y - 14)
+    }
+  })
+
+  if (!showProgress || engine.state === 'idle' || !actionPts) return
+
+  // Hold-progress ring centered on the acting hand.
+  const pts: Mapped[] = actionPts
   const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length
   const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length
   const spread = Math.max(...pts.map((p) => Math.hypot(p.x - cx, p.y - cy)))

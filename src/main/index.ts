@@ -12,6 +12,7 @@ import { pathToFileURL } from 'node:url'
 import { writeFile } from 'node:fs/promises'
 import { loadConfig, saveConfig } from './config'
 import { sendHotkey } from './keysender'
+import { CONFIG_VERSION } from '../shared/types'
 import type { AppConfig, AppMode, TriggerPayload, TriggerResult } from '../shared/types'
 import { isValidHotkey } from '../shared/hotkeys'
 
@@ -92,7 +93,7 @@ function registerIpc(): void {
   ipcMain.handle('config:get', (): AppConfig => config)
 
   ipcMain.handle('config:save', (_event, next: AppConfig) => {
-    if (!next || next.version !== 1 || !Array.isArray(next.mappings)) {
+    if (!next || next.version !== CONFIG_VERSION || !Array.isArray(next.mappings)) {
       throw new Error('Invalid config payload')
     }
     config = next
