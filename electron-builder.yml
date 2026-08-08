@@ -1,0 +1,22 @@
+appId: com.eoinest.hotkeygesture
+productName: HotKey Gesture
+directories:
+  output: dist
+files:
+  - out/**
+  - package.json
+mac:
+  category: public.app-category.utilities
+  extendInfo:
+    NSCameraUsageDescription: HotKey Gesture uses your camera to recognize hand gestures. Video never leaves your device.
+    NSAppleEventsUsageDescription: HotKey Gesture sends keystrokes via System Events when a gesture triggers a shortcut.
+  target:
+    - dmg
+    - zip
+win:
+  target:
+    - nsis
+linux:
+  target:
+    - AppImage
+  category: Utility
