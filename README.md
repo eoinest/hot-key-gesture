@@ -17,8 +17,8 @@ hand tracking). No frames or data ever leave your machine.
 - **Move the mouse with your hand** — map a gesture (🤏 pinch by default) to *cursor control*
   instead of a shortcut. Hold it and the pointer follows your pinch around the screen, with
   configurable reach, smoothing, and target display. Release to hand the mouse back.
-- **Click without touching anything** — mid-drag, switch the steering hand to ✊ a fist to
-  left-click. Return to the pinch to arm the next click.
+- **Click without touching anything** — mid-drag, **raise your pinky** while staying pinched to
+  left-click. Lower it to arm the next click.
 - **Fully configurable** — map any gesture to any shortcut with a click-to-record hotkey
   field, enable/disable rows, add/remove mappings. Tuning knobs for the arm gesture, hold
   time, repeat interval, confidence threshold, and smoothing. The guard can be switched off
@@ -131,12 +131,24 @@ it **engages** after the hold and then steers the cursor continuously until you 
   reliably. Deferring to a confident classification is what keeps the arming hand from
   registering as a pinch.
 
-**Clicking.** While steering, switching the moving hand to the **click gesture** (✊ fist by
-default) left-clicks where the cursor sits. It needs two consecutive frames, so a single
-misread can't click, and you must return to the pinch before it will click again — holding a
-fist gives you one click, not a stream. The click gesture is allowed to match the arm gesture
-because hand roles are locked to *handedness* for the life of a session, so a fist on the
-steering hand is never mistaken for the arming hand.
+**Clicking.** While steering, **raise your pinky** while the rest of the hand stays pinched to
+left-click. The pinch point barely moves, so the cursor stays put at the moment of the click —
+switching the whole hand to another gesture drags the pointer as the hand changes shape, which
+is why this is the default.
+
+Pinky detection compares how far the pinky tip reaches against the ring finger beside it. That
+was the only measurement that came out cleanly bimodal on real hands: curled clusters at
+0.71–0.86 and raised at 1.06–1.12, with an empty gap between. Absolute pinky length does *not*
+separate them, because a pinch curls the pinky far enough that its length overlaps the raised
+case. The thresholds straddle the gap with hysteresis.
+
+A click needs two consecutive frames, so a single misread can't click, and the pinky must go
+back down before it will click again — holding it up gives you one click, not a stream.
+
+The alternative **gesture** click mode switches the whole steering hand to a chosen gesture
+(✊ fist by default). It may match the arm gesture, because hand roles are locked to
+*handedness* for the life of a session, so a fist on the steering hand is never mistaken for
+the arming hand.
 
 Cursor movement goes through a small Swift helper (`native/mouse-helper.swift`) kept alive as
 a single process while control is active — spawning one per update would cap the pointer far

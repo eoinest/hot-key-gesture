@@ -269,29 +269,51 @@ export function SettingsPanel({
         onChange={(margin) => onMouseChange({ ...mouse, margin })}
       />
       <ToggleRow
-        label="Click with a gesture"
-        hint="While steering, switch the moving hand to the click gesture to left-click. Return to the steering gesture before it can click again."
+        label="Click while steering"
+        hint="Left-click without letting go of the cursor. Return to a plain pinch before it can click again."
         checked={mouse.clickEnabled}
         onChange={(clickEnabled) => onMouseChange({ ...mouse, clickEnabled })}
       />
       <div className={`setting-row ${mouse.clickEnabled ? '' : 'setting-disabled'}`}>
         <div className="setting-text">
-          <label>Click gesture</label>
-          <p>Only active mid-session, so it can safely match the arm gesture.</p>
+          <label>Click by</label>
+          <p>
+            Raising a pinky barely moves the pinch point, so the cursor stays put as you click.
+            A whole-hand gesture is more deliberate but drags the pointer.
+          </p>
         </div>
         <select
           className="device-select"
           disabled={!mouse.clickEnabled}
-          value={mouse.clickGesture}
-          onChange={(e) => onMouseChange({ ...mouse, clickGesture: e.target.value as GestureName })}
+          value={mouse.clickMode}
+          onChange={(e) =>
+            onMouseChange({ ...mouse, clickMode: e.target.value as 'pinky' | 'gesture' })
+          }
         >
-          {GESTURES.map((g) => (
-            <option key={g.name} value={g.name}>
-              {g.emoji} {g.label}
-            </option>
-          ))}
+          <option value="pinky">🤙 Raising your pinky</option>
+          <option value="gesture">✊ A hand gesture</option>
         </select>
       </div>
+      {mouse.clickMode === 'gesture' && (
+        <div className={`setting-row ${mouse.clickEnabled ? '' : 'setting-disabled'}`}>
+          <div className="setting-text">
+            <label>Click gesture</label>
+            <p>Only active mid-session, so it can safely match the arm gesture.</p>
+          </div>
+          <select
+            className="device-select"
+            disabled={!mouse.clickEnabled}
+            value={mouse.clickGesture}
+            onChange={(e) => onMouseChange({ ...mouse, clickGesture: e.target.value as GestureName })}
+          >
+            {GESTURES.map((g) => (
+              <option key={g.name} value={g.name}>
+                {g.emoji} {g.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <SliderRow
         label="Cursor smoothing"
         hint="Higher is steadier against hand shake but lags behind your hand more."
