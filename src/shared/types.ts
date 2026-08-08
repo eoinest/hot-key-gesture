@@ -181,7 +181,10 @@ export const DEFAULT_ENGINE_SETTINGS: EngineSettings = {
   requireArmHand: true,
   armGesture: 'Closed_Fist',
   gapToleranceMs: 400,
-  maxHands: 2,
+  // Measured: with a limit of 2, another person's hand in shot takes a slot and
+  // two-hand acquisition took ~24 s. At 4 it was immediate. The frame-rate cost
+  // is the lesser problem, and 2 is one setting away for anyone who disagrees.
+  maxHands: 4,
 }
 
 export function defaultConfig(): AppConfig {

@@ -166,8 +166,8 @@ export function SettingsPanel({
           value={engine.maxHands}
           onChange={(e) => set({ maxHands: Number(e.target.value) as 2 | 4 })}
         >
+          <option value={4}>4 — reliable</option>
           <option value={2}>2 — faster</option>
-          <option value={4}>4 — busy room</option>
         </select>
       </div>
       <SliderRow
