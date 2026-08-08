@@ -97,10 +97,17 @@ export function CameraPanel({
       )}
 
       <div className="hud">
-        <div className={`gesture-chip state-${showHoldState ? hud.state : 'idle'}`}>
+        <div
+          className={`gesture-chip state-${showHoldState ? hud.state : 'idle'} ${
+            hud.bridging ? 'bridging' : ''
+          }`}
+        >
           <span className="chip-emoji">{gestureEmoji(hud.stable)}</span>
           <div className="chip-main">
-            <div className="chip-label">{gestureLabel(hud.stable)}</div>
+            <div className="chip-label">
+              {gestureLabel(hud.stable)}
+              {hud.bridging && <span className="bridge-tag">holding</span>}
+            </div>
             <div className="conf-bar">
               <div style={{ width: `${Math.round(hud.confidence * 100)}%` }} />
             </div>

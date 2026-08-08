@@ -61,6 +61,13 @@ export interface EngineSettings {
   requireArmHand: boolean
   /** The gesture the arm hand must hold while the other hand acts. */
   armGesture: GestureName
+  /**
+   * How long a recognized gesture survives a detection dropout before it is
+   * considered gone. Hand tracking drops frames routinely — especially during
+   * a pinch, where the fingers occlude each other — and without this a blink
+   * costs a full re-hold.
+   */
+  gapToleranceMs: number
 }
 
 export interface CameraSettings {
@@ -91,12 +98,22 @@ export interface MouseSettings {
   smoothing: number
   /** Electron display id to steer, or null for the primary display. */
   displayId: number | null
+  /** Click when the steering hand switches to `clickGesture` mid-session. */
+  clickEnabled: boolean
+  /**
+   * Gesture that clicks while pointer control is engaged. It may equal the
+   * arm gesture — hand roles are locked for the duration of a session, so a
+   * fist on the steering hand is unambiguous.
+   */
+  clickGesture: GestureName
 }
 
 export const DEFAULT_MOUSE_SETTINGS: MouseSettings = {
   margin: 0.2,
   smoothing: 0.55,
   displayId: null,
+  clickEnabled: true,
+  clickGesture: 'Closed_Fist',
 }
 
 /** Appended on load when a config has no pointer-control mapping yet. */
@@ -142,6 +159,7 @@ export const DEFAULT_ENGINE_SETTINGS: EngineSettings = {
   requireRelease: false,
   requireArmHand: true,
   armGesture: 'Closed_Fist',
+  gapToleranceMs: 400,
 }
 
 export function defaultConfig(): AppConfig {

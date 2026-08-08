@@ -12,7 +12,13 @@ import { pathToFileURL } from 'node:url'
 import { writeFile } from 'node:fs/promises'
 import { loadConfig, saveConfig } from './config'
 import { sendHotkey } from './keysender'
-import { listDisplays, moveCursorNormalized, pointerAvailable, stopPointer } from './mouse'
+import {
+  clickCursor,
+  listDisplays,
+  moveCursorNormalized,
+  pointerAvailable,
+  stopPointer,
+} from './mouse'
 import type { DisplayInfo } from './mouse'
 import { CONFIG_VERSION } from '../shared/types'
 import type { AppConfig, AppMode, TriggerPayload, TriggerResult } from '../shared/types'
@@ -27,6 +33,10 @@ let mainWindow: BrowserWindow | null = null
 // Minimum spacing between synthesized keystrokes, independent of engine cooldowns.
 const GLOBAL_RATE_LIMIT_MS = 150
 let lastSentAt = 0
+
+// Clicks are far more disruptive than a cursor move if something misfires.
+const CLICK_RATE_LIMIT_MS = 350
+let lastClickAt = 0
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -132,6 +142,14 @@ function registerIpc(): void {
     if (config.mode !== 'live') return 'Not in live mode'
     if (!Number.isFinite(nx) || !Number.isFinite(ny)) return 'Invalid coordinates'
     return moveCursorNormalized(nx, ny, config.mouse)
+  })
+
+  ipcMain.handle('mouse:click', (): string | null => {
+    if (config.mode !== 'live') return 'Not in live mode'
+    const now = Date.now()
+    if (now - lastClickAt < CLICK_RATE_LIMIT_MS) return 'Rate limited'
+    lastClickAt = now
+    return clickCursor()
   })
 
   ipcMain.handle('mouse:stop', () => {

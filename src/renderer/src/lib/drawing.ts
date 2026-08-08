@@ -124,6 +124,7 @@ export function drawOverlay(
 
   // Pointer control: show the mapped screen area and where the cursor is going.
   if (pointer) {
+    ctx.globalAlpha = engine.bridging ? 0.45 : 1
     ctx.save()
     ctx.strokeStyle = 'rgba(74, 222, 128, 0.35)'
     ctx.setLineDash([6, 6])
@@ -148,7 +149,8 @@ export function drawOverlay(
     ctx.fillStyle = FIRED
     ctx.font = 'bold 12px system-ui'
     ctx.textAlign = 'center'
-    ctx.fillText('CURSOR', px, py + 28)
+    ctx.fillText(engine.bridging ? 'CURSOR (held)' : 'CURSOR', px, py + 28)
+    ctx.globalAlpha = 1
   }
 
   if (!showProgress || engine.state === 'idle' || !actionPts) return

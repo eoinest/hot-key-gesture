@@ -17,6 +17,8 @@ hand tracking). No frames or data ever leave your machine.
 - **Move the mouse with your hand** — map a gesture (🤏 pinch by default) to *cursor control*
   instead of a shortcut. Hold it and the pointer follows your pinch around the screen, with
   configurable reach, smoothing, and target display. Release to hand the mouse back.
+- **Click without touching anything** — mid-drag, switch the steering hand to ✊ a fist to
+  left-click. Return to the pinch to arm the next click.
 - **Fully configurable** — map any gesture to any shortcut with a click-to-record hotkey
   field, enable/disable rows, add/remove mappings. Tuning knobs for the arm gesture, hold
   time, repeat interval, confidence threshold, and smoothing. The guard can be switched off
@@ -79,6 +81,10 @@ Tunables in **Settings**:
 - **Confidence threshold** (default 55%) and **smoothing** (default 5 frames): the detected
   gesture only changes when a new label wins a majority of the sliding window, so single
   misclassified frames are ignored.
+- **Dropout tolerance** (default 400 ms): hand tracking loses the hand for a few frames at a
+  time, especially mid-pinch where the fingers occlude each other. A dropout shorter than this
+  is bridged rather than treated as a release, so a blink doesn't cost you a whole re-hold. The
+  HUD marks the gesture `HOLDING` while it's bridging.
 
 Per-mapping `holdMs` / `cooldownMs` overrides are supported in the config file.
 
@@ -96,6 +102,23 @@ it **engages** after the hold and then steers the cursor continuously until you 
 - Multi-monitor: pick which display the frame maps onto. Defaults to the primary display.
 - In **Test** mode the cursor is *not* moved — the overlay draws a `CURSOR` crosshair showing
   where it would go, so you can practise safely.
+- Pinch detection is a Schmitt trigger: it takes a tighter pinch to start (0.32 of palm width)
+  than to keep going (0.48), so the pointer doesn't let go every time your fingers drift. If
+  the hand disappears mid-drag the cursor freezes in place until tracking recovers or the
+  dropout tolerance runs out.
+- MediaPipe has no pinch class, so the pinch comes from the landmarks — but only when the
+  classifier has no confident answer. Measuring real hands showed a pinch and a fist are
+  nearly identical geometrically (people curl the other fingers during a pinch, so
+  "middle/ring/pinky extended" does *not* separate them), while MediaPipe recognizes a fist
+  reliably. Deferring to a confident classification is what keeps the arming hand from
+  registering as a pinch.
+
+**Clicking.** While steering, switching the moving hand to the **click gesture** (✊ fist by
+default) left-clicks where the cursor sits. It needs two consecutive frames, so a single
+misread can't click, and you must return to the pinch before it will click again — holding a
+fist gives you one click, not a stream. The click gesture is allowed to match the arm gesture
+because hand roles are locked to *handedness* for the life of a session, so a fist on the
+steering hand is never mistaken for the arming hand.
 
 Cursor movement goes through a small Swift helper (`native/mouse-helper.swift`) kept alive as
 a single process while control is active — spawning one per update would cap the pointer far
