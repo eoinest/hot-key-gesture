@@ -133,8 +133,8 @@ export function defaultPinchMouseMapping(): GestureMapping {
   }
 }
 
-/** Bumped when engine defaults change in a way that should reset user timings. */
-export const CONFIG_VERSION = 2
+/** Bumped when tuning defaults change in a way that should adopt the new values. */
+export const CONFIG_VERSION = 3
 
 export interface AppConfig {
   version: number

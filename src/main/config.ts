@@ -16,17 +16,22 @@ export function loadConfig(): AppConfig {
   const defaults = defaultConfig()
   try {
     const raw = JSON.parse(readFileSync(configPath(), 'utf-8')) as Partial<AppConfig>
-    // An older config predates the two-hand safety guard, and its timings were
-    // tuned for one-handed triggering. Adopt the new engine defaults wholesale
-    // rather than leaving a 250 ms hold behind a guard meant to be deliberate.
-    const engine = raw.version === CONFIG_VERSION ? { ...defaults.engine, ...raw.engine } : defaults.engine
+    // An older config carries tuning chosen for behaviour that has since
+    // changed — one-handed timings from before the safety guard, and a single
+    // target display from before spanning. Merging would silently preserve
+    // values nobody picked (a null displayId still traps the cursor on one
+    // screen), so an out-of-date config adopts the new defaults wholesale.
+    // Mappings and camera choice are the user's and are always kept.
+    const current = raw.version === CONFIG_VERSION
+    const engine = current ? { ...defaults.engine, ...raw.engine } : defaults.engine
+    const mouse = current ? { ...defaults.mouse, ...raw.mouse } : defaults.mouse
     return {
       ...defaults,
       ...raw,
       version: CONFIG_VERSION,
       camera: { ...defaults.camera, ...raw.camera },
       sound: { ...defaults.sound, ...raw.sound },
-      mouse: { ...defaults.mouse, ...raw.mouse },
+      mouse,
       engine,
       mappings: withPointerMapping(
         Array.isArray(raw.mappings) && raw.mappings.length ? raw.mappings : defaults.mappings,
