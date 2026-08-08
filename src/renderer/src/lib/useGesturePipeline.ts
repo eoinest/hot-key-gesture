@@ -19,6 +19,8 @@ export interface Hud {
   armed: boolean
   /** How many hands the recognizer currently sees. */
   handCount: number
+  /** Holding a gesture through a momentary detection dropout. */
+  bridging: boolean
 }
 
 export type RecognizerStatus = 'loading' | 'ready' | 'error'
@@ -35,10 +37,17 @@ interface PipelineOptions {
   config: AppConfig | null
   configRef: React.RefObject<AppConfig | null>
   onFired: (mapping: GestureMapping, mode: AppMode) => void
+  onClick: (mode: AppMode) => void
   onLog: LogFn
 }
 
-export function useGesturePipeline({ config, configRef, onFired, onLog }: PipelineOptions) {
+export function useGesturePipeline({
+  config,
+  configRef,
+  onFired,
+  onClick,
+  onLog,
+}: PipelineOptions) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const recognizerRef = useRef<GestureRecognizer | null>(null)
@@ -52,6 +61,7 @@ export function useGesturePipeline({ config, configRef, onFired, onLog }: Pipeli
     fps: 0,
     armed: false,
     handCount: 0,
+    bridging: false,
   })
   const [flashToken, setFlashToken] = useState(0)
   const [cameraError, setCameraError] = useState<string | null>(null)
@@ -59,19 +69,23 @@ export function useGesturePipeline({ config, configRef, onFired, onLog }: Pipeli
   const [cameraNonce, setCameraNonce] = useState(0)
 
   const onFiredRef = useRef(onFired)
+  const onClickRef = useRef(onClick)
   const onLogRef = useRef(onLog)
   useEffect(() => {
     onFiredRef.current = onFired
+    onClickRef.current = onClick
     onLogRef.current = onLog
   })
 
   const smoothedPointer = useRef<{ x: number; y: number } | null>(null)
   const wasTracking = useRef(false)
+  const wasPinching = useRef<boolean[]>([])
 
   const engineRef = useRef<GestureEngine | null>(null)
   if (!engineRef.current) {
     engineRef.current = new GestureEngine(() => ({
       settings: configRef.current?.engine ?? DEFAULT_ENGINE_SETTINGS,
+      mouse: configRef.current?.mouse,
       mappings: (configRef.current?.mappings ?? []).filter(
         (m) => m.action === 'mouse' || isValidHotkey(m.hotkey),
       ),
@@ -192,19 +206,45 @@ export function useGesturePipeline({ config, configRef, onFired, onLog }: Pipeli
       const allLandmarks = result.landmarks ?? []
       const hands: HandSample[] = allLandmarks.map((landmarks, i) => {
         const top = result.gestures?.[i]?.[0]
-        if (top && top.categoryName && top.categoryName !== 'None') {
-          return { gesture: top.categoryName as GestureName, confidence: top.score }
+        const named = top?.categoryName && top.categoryName !== 'None' ? top : null
+
+        // Pinch wins over the classifier. MediaPipe has no pinch class and
+        // confidently reports pinched fingers as a fist, so deferring to it
+        // would hide a pinch that the landmarks state outright. detectPinch
+        // requires the free fingers to be extended, so a real fist won't match.
+        const handedness = result.handedness?.[i]?.[0]?.categoryName
+
+        // Only look for a pinch when the classifier has nothing confident to
+        // say. A fist and a pinch are nearly indistinguishable geometrically
+        // (measured on real hands), but MediaPipe recognizes a fist reliably —
+        // so deferring to a confident classification is what keeps the arming
+        // hand from being read as a pinch.
+        if (!named || named.score < cfg.engine.minConfidence) {
+          const pinch = detectPinch(landmarks, wasPinching.current[i] ?? false)
+          wasPinching.current[i] = pinch.pinch
+          if (pinch.pinch) {
+            return { gesture: 'Pinch' as GestureName, confidence: pinch.confidence, handedness }
+          }
+        } else {
+          wasPinching.current[i] = false
         }
-        const pinch = detectPinch(landmarks)
-        return pinch.pinch
-          ? { gesture: 'Pinch' as GestureName, confidence: pinch.confidence }
-          : { gesture: null, confidence: 0 }
+
+        return named
+          ? { gesture: named.categoryName as GestureName, confidence: named.score, handedness }
+          : { gesture: null, confidence: 0, handedness }
       })
+      wasPinching.current.length = allLandmarks.length
 
       const frame = engine.frame({ hands, t })
 
       // --- Pointer control: steer the cursor from the acting hand's pinch.
-      let pointer: { x: number; y: number } | null = null
+      //
+      // While tracking continues but the hand is momentarily missing, freeze
+      // the cursor where it was rather than releasing it. Only a real end of
+      // tracking tears the session down.
+      let pointer: { x: number; y: number } | null = frame.tracking
+        ? smoothedPointer.current
+        : null
       if (frame.tracking && frame.actionHandIndex >= 0) {
         const raw = pinchPoint(allLandmarks[frame.actionHandIndex])
         if (raw) {
@@ -223,9 +263,9 @@ export function useGesturePipeline({ config, configRef, onFired, onLog }: Pipeli
           smoothedPointer.current = pointer
           if (cfg.mode === 'live') void window.api.moveCursor(pointer.x, pointer.y)
         }
-      } else if (smoothedPointer.current) {
+      } else if (!frame.tracking && wasTracking.current) {
         smoothedPointer.current = null
-        if (wasTracking.current) void window.api.stopCursor()
+        void window.api.stopCursor()
       }
       wasTracking.current = !!frame.tracking
 
@@ -244,6 +284,11 @@ export function useGesturePipeline({ config, configRef, onFired, onLog }: Pipeli
         onFiredRef.current(frame.fired, cfg.mode)
       }
 
+      if (frame.click && cfg.mode !== 'paused') {
+        setFlashToken((n) => n + 1)
+        onClickRef.current(cfg.mode)
+      }
+
       if (t - lastHudPush > 100) {
         lastHudPush = t
         setHud({
@@ -254,6 +299,7 @@ export function useGesturePipeline({ config, configRef, onFired, onLog }: Pipeli
           fps: Math.round(fpsEma),
           armed: frame.armed,
           handCount: hands.length,
+          bridging: frame.bridging,
         })
       }
     }

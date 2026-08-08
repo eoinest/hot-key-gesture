@@ -147,10 +147,26 @@ export default function App() {
     [addLog, platform],
   )
 
+  const handleClick = useCallback(
+    (mode: AppMode) => {
+      const { enabled, volume } = soundRef.current
+      if (enabled) playBoop(volume)
+      if (mode === 'test') {
+        addLog('test', '🖱️ Click (test — not sent)')
+        return
+      }
+      void window.api.clickCursor().then((error) => {
+        addLog(error ? 'error' : 'live', error ? `Click failed: ${error}` : '🖱️ Clicked')
+      })
+    },
+    [addLog],
+  )
+
   const pipeline = useGesturePipeline({
     config,
     configRef,
     onFired: handleFired,
+    onClick: handleClick,
     onLog: addLog,
   })
 

@@ -113,6 +113,19 @@ export function moveCursorNormalized(
   }
 }
 
+/** Left click at the cursor's current position. */
+export function clickCursor(): string | null {
+  const proc = ensureHelper()
+  if (!proc) return spawnFailed ?? 'Cursor helper unavailable'
+  try {
+    proc.stdin.write('click\n')
+    return null
+  } catch (err) {
+    helper = null
+    return err instanceof Error ? err.message : String(err)
+  }
+}
+
 function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v
 }

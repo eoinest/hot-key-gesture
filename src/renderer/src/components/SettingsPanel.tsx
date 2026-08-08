@@ -154,6 +154,16 @@ export function SettingsPanel({
 
       <h3 className="settings-heading">Recognition</h3>
       <SliderRow
+        label="Dropout tolerance"
+        hint="How long a gesture survives when tracking briefly loses your hand. Raise it if the pinch keeps letting go; lower it if gestures linger after you stop."
+        value={engine.gapToleranceMs}
+        min={0}
+        max={1200}
+        step={50}
+        format={(v) => (v === 0 ? 'off' : `${v} ms`)}
+        onChange={(gapToleranceMs) => set({ gapToleranceMs })}
+      />
+      <SliderRow
         label="Confidence threshold"
         hint="Lower catches gestures more eagerly; higher avoids false positives."
         value={engine.minConfidence}
@@ -250,6 +260,30 @@ export function SettingsPanel({
         format={(v) => `${Math.round((1 - v * 2) * 100)}% of frame`}
         onChange={(margin) => onMouseChange({ ...mouse, margin })}
       />
+      <ToggleRow
+        label="Click with a gesture"
+        hint="While steering, switch the moving hand to the click gesture to left-click. Return to the steering gesture before it can click again."
+        checked={mouse.clickEnabled}
+        onChange={(clickEnabled) => onMouseChange({ ...mouse, clickEnabled })}
+      />
+      <div className={`setting-row ${mouse.clickEnabled ? '' : 'setting-disabled'}`}>
+        <div className="setting-text">
+          <label>Click gesture</label>
+          <p>Only active mid-session, so it can safely match the arm gesture.</p>
+        </div>
+        <select
+          className="device-select"
+          disabled={!mouse.clickEnabled}
+          value={mouse.clickGesture}
+          onChange={(e) => onMouseChange({ ...mouse, clickGesture: e.target.value as GestureName })}
+        >
+          {GESTURES.map((g) => (
+            <option key={g.name} value={g.name}>
+              {g.emoji} {g.label}
+            </option>
+          ))}
+        </select>
+      </div>
       <SliderRow
         label="Cursor smoothing"
         hint="Higher is steadier against hand shake but lags behind your hand more."

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { GestureEngine } from '../src/shared/gestureEngine'
 import type { EngineOptions, HandSample } from '../src/shared/gestureEngine'
-import type { EngineSettings, GestureMapping, GestureName } from '../src/shared/types'
+import type {
+  EngineSettings,
+  GestureMapping,
+  GestureName,
+  MouseSettings,
+} from '../src/shared/types'
 
 /** Single-hand baseline: safety guard off, short timings for readable tests. */
 const SETTINGS: EngineSettings = {
@@ -12,6 +17,9 @@ const SETTINGS: EngineSettings = {
   requireRelease: true,
   requireArmHand: false,
   armGesture: 'Closed_Fist',
+  // Off by default in tests so each case isolates one behaviour; the bridging
+  // suite below opts in.
+  gapToleranceMs: 0,
 }
 
 const THUMB_UP_MAPPING: GestureMapping = {
@@ -296,6 +304,160 @@ describe('pointer-control mappings', () => {
     const last = results.at(-1)!
     expect(last.actionHandIndex).toBe(1)
     expect(last.armHandIndex).toBe(0)
+  })
+})
+
+describe('bridging detection dropouts', () => {
+  const POINTER_MAPPING: GestureMapping = {
+    id: 'mouse1',
+    gesture: 'Pinch',
+    action: 'mouse',
+    enabled: true,
+  }
+
+  it('keeps a pointer session alive across a short dropout', () => {
+    const { engine } = makeEngine({ gapToleranceMs: 400 }, [POINTER_MAPPING])
+    expect(feed1(engine, 'Pinch', 30, 0).at(-1)!.tracking).not.toBeNull()
+    // ~200 ms with no hand detected at all.
+    const gap = feed(engine, [], 6, 1000)
+    expect(gap.every((r) => r.tracking !== null)).toBe(true)
+    expect(gap.at(-1)!.bridging).toBe(true)
+    // Pinch returns: still the same session, no re-hold required.
+    const resumed = feed1(engine, 'Pinch', 5, 1200)
+    expect(resumed.at(-1)!.tracking).not.toBeNull()
+    expect(resumed.at(-1)!.bridging).toBe(false)
+    expect(resumed.some((r) => r.fired)).toBe(false)
+  })
+
+  it('still releases once the dropout exceeds the tolerance', () => {
+    const { engine } = makeEngine({ gapToleranceMs: 400 }, [POINTER_MAPPING])
+    feed1(engine, 'Pinch', 30, 0)
+    const gap = feed(engine, [], 30, 1000)
+    expect(gap.at(-1)!.tracking).toBeNull()
+    expect(gap.at(-1)!.stable).toBeNull()
+  })
+
+  it('bridges a misclassification while a pointer session is engaged', () => {
+    const { engine } = makeEngine({ gapToleranceMs: 400 }, [POINTER_MAPPING])
+    feed1(engine, 'Pinch', 30, 0)
+    // Pinched fingers briefly read as a fist.
+    const misread = feed1(engine, 'Closed_Fist', 6, 1000)
+    expect(misread.every((r) => r.tracking !== null)).toBe(true)
+    expect(feed1(engine, 'Pinch', 5, 1200).at(-1)!.stable).toBe('Pinch')
+  })
+
+  it('does not bridge a deliberate gesture change outside a pointer session', () => {
+    const { engine } = makeEngine({ gapToleranceMs: 400 }, [
+      THUMB_UP_MAPPING,
+      { id: 'm2', gesture: 'Open_Palm', hotkey: { key: 'space', modifiers: [] }, enabled: true },
+    ])
+    feed1(engine, 'Thumb_Up', 10, 0)
+    // Switching to a different gesture takes effect on majority, not after the grace.
+    const switched = feed1(engine, 'Open_Palm', 4, 400)
+    expect(switched.at(-1)!.stable).toBe('Open_Palm')
+  })
+
+  it('keeps the guard armed through a blink of the arm hand', () => {
+    const { engine } = makeEngine({ gapToleranceMs: 400, requireArmHand: true }, [POINTER_MAPPING])
+    expect(feed(engine, [hand('Closed_Fist'), hand('Pinch')], 30, 0).at(-1)!.armed).toBe(true)
+    // Arm hand vanishes for ~130 ms.
+    const blink = feed(engine, [hand('Pinch')], 4, 1000)
+    expect(blink.at(-1)!.armed).toBe(true)
+    expect(blink.at(-1)!.tracking).not.toBeNull()
+  })
+
+  it('tolerance of zero preserves the original drop-immediately behaviour', () => {
+    const { engine } = makeEngine({ gapToleranceMs: 0 }, [POINTER_MAPPING])
+    feed1(engine, 'Pinch', 30, 0)
+    expect(feed(engine, [], 5, 1000).at(-1)!.tracking).toBeNull()
+  })
+})
+
+describe('click while steering', () => {
+  const POINTER_MAPPING: GestureMapping = {
+    id: 'mouse1',
+    gesture: 'Pinch',
+    action: 'mouse',
+    enabled: true,
+  }
+  const MOUSE: MouseSettings = {
+    margin: 0.2,
+    smoothing: 0.5,
+    displayId: null,
+    clickEnabled: true,
+    clickGesture: 'Closed_Fist',
+  }
+
+  /** Right hand steers, left hand arms — the shape the app actually produces. */
+  const steer = (gesture: GestureName | null): HandSample[] => [
+    { gesture: 'Closed_Fist', confidence: 0.9, handedness: 'Left' },
+    { gesture, confidence: 0.9, handedness: 'Right' },
+  ]
+
+  function pointerEngine(mouse: Partial<MouseSettings> = {}) {
+    const options: EngineOptions = {
+      settings: { ...SETTINGS, requireArmHand: true, gapToleranceMs: 400 },
+      mappings: [POINTER_MAPPING],
+      mouse: { ...MOUSE, ...mouse },
+    }
+    const engine = new GestureEngine(() => options)
+    // Establish the pointer session.
+    const started = feed(engine, steer('Pinch'), 30, 0)
+    expect(started.at(-1)!.tracking).not.toBeNull()
+    return engine
+  }
+
+  it('clicks once when the steering hand makes a fist', () => {
+    const engine = pointerEngine()
+    const clicks = feed(engine, steer('Closed_Fist'), 20, 1000).filter((r) => r.click)
+    expect(clicks).toHaveLength(1)
+  })
+
+  it('does not end the pointer session while clicking', () => {
+    const engine = pointerEngine()
+    const results = feed(engine, steer('Closed_Fist'), 20, 1000)
+    expect(results.every((r) => r.tracking !== null)).toBe(true)
+    expect(results.at(-1)!.stable).toBe('Pinch')
+  })
+
+  it('does not repeat while the fist is held', () => {
+    const engine = pointerEngine()
+    expect(feed(engine, steer('Closed_Fist'), 120, 1000).filter((r) => r.click)).toHaveLength(1)
+  })
+
+  it('clicks again after returning to the pinch', () => {
+    const engine = pointerEngine()
+    expect(feed(engine, steer('Closed_Fist'), 20, 1000).filter((r) => r.click)).toHaveLength(1)
+    feed(engine, steer('Pinch'), 20, 2000)
+    expect(feed(engine, steer('Closed_Fist'), 20, 3000).filter((r) => r.click)).toHaveLength(1)
+  })
+
+  it('ignores a single-frame fist misread', () => {
+    const engine = pointerEngine()
+    expect(feed(engine, steer('Closed_Fist'), 1, 1000).filter((r) => r.click)).toHaveLength(0)
+  })
+
+  it('keeps hand roles locked so a two-fist frame does not swap them', () => {
+    const engine = pointerEngine()
+    const results = feed(engine, steer('Closed_Fist'), 10, 1000)
+    // The right hand keeps steering even though both hands now show a fist.
+    expect(results.at(-1)!.actionHandIndex).toBe(1)
+    expect(results.at(-1)!.armHandIndex).toBe(0)
+  })
+
+  it('does not click when clicking is disabled', () => {
+    const engine = pointerEngine({ clickEnabled: false })
+    expect(feed(engine, steer('Closed_Fist'), 20, 1000).filter((r) => r.click)).toHaveLength(0)
+  })
+
+  it('never clicks outside a pointer session', () => {
+    const options: EngineOptions = {
+      settings: { ...SETTINGS, requireArmHand: true },
+      mappings: [THUMB_UP_MAPPING],
+      mouse: MOUSE,
+    }
+    const engine = new GestureEngine(() => options)
+    expect(feed(engine, steer('Thumb_Up'), 40, 0).some((r) => r.click)).toBe(false)
   })
 })
 

@@ -1,4 +1,4 @@
-import type { EngineSettings, GestureMapping, GestureName } from './types'
+import type { EngineSettings, GestureMapping, GestureName, MouseSettings } from './types'
 
 /** One detected hand in a single video frame. */
 export interface HandSample {
@@ -6,6 +6,11 @@ export interface HandSample {
   gesture: GestureName | null
   /** Recognizer confidence 0..1 for the label. */
   confidence: number
+  /**
+   * 'Left' / 'Right' from the recognizer. Detection order can swap between
+   * frames, so this is what pins a hand to a role during a pointer session.
+   */
+  handedness?: string
 }
 
 export interface FrameSample {
@@ -29,6 +34,12 @@ export interface EngineFrameResult {
   holdProgress: number
   /** True when the safety guard is satisfied (or disabled). */
   armed: boolean
+  /**
+   * True while the engine is holding a gesture through a detection dropout —
+   * the gesture is not currently visible but has not timed out. Callers should
+   * keep doing what they were doing and freeze any position they derive.
+   */
+  bridging: boolean
   /** Index into `hands` of the arm hand, or -1. */
   armHandIndex: number
   /** Index into `hands` of the acting hand, or -1. */
@@ -37,6 +48,10 @@ export interface EngineFrameResult {
   activeMapping: GestureMapping | null
   /** Set on the exact frame a trigger fires. */
   fired: GestureMapping | null
+  /** Set on the exact frame a pointer-session click should be sent. */
+  click: boolean
+  /** True while the steering hand is holding the click gesture. */
+  clickHeld: boolean
   /**
    * Set every frame while a pointer-control mapping is engaged. Unlike
    * `fired`, this is continuous: the cursor should follow the acting hand for
@@ -48,6 +63,7 @@ export interface EngineFrameResult {
 export interface EngineOptions {
   settings: EngineSettings
   mappings: GestureMapping[]
+  mouse?: MouseSettings
 }
 
 interface HoldState {
@@ -61,6 +77,8 @@ interface Resolution {
   armed: boolean
   armHandIndex: number
   actionHandIndex: number
+  /** Steering hand is showing the click gesture this frame. */
+  clickHeld: boolean
 }
 
 /**
@@ -78,6 +96,19 @@ export class GestureEngine {
   private stableArmed = false
   private holding: HoldState | null = null
   private lastFiredAt = new Map<GestureName, number>()
+  /** When the current stable gesture was last actually observed. */
+  private lastStableSeenAt = 0
+  /** When the guard was last actually satisfied. */
+  private lastArmedAt = 0
+  /** Whether a pointer mapping was tracking on the previous frame. */
+  private pointerEngaged = false
+  /** Gesture that started the active pointer session. */
+  private sessionGesture: GestureName | null = null
+  private lockedActionHand: string | null = null
+  private lockedArmHand: string | null = null
+  /** Frames the click gesture has been held for, and whether it already fired. */
+  private clickFrames = 0
+  private clickFired = false
 
   constructor(private readonly getOptions: () => EngineOptions) {}
 
@@ -88,6 +119,14 @@ export class GestureEngine {
     this.stableArmed = false
     this.holding = null
     this.lastFiredAt.clear()
+    this.lastStableSeenAt = 0
+    this.lastArmedAt = 0
+    this.pointerEngaged = false
+    this.sessionGesture = null
+    this.lockedActionHand = null
+    this.lockedArmHand = null
+    this.clickFrames = 0
+    this.clickFired = false
   }
 
   /**
@@ -97,10 +136,40 @@ export class GestureEngine {
    * a different hand. Either hand may arm, so it works left- or right-handed,
    * and two arm-gesture hands means the arm gesture is also the action.
    */
-  private resolve(sample: FrameSample, settings: EngineSettings): Resolution {
+  private resolve(sample: FrameSample, settings: EngineSettings, mouse?: MouseSettings): Resolution {
     const gated = sample.hands.map((h) =>
       h.gesture && h.confidence >= settings.minConfidence ? h.gesture : null,
     )
+
+    // While pointer control is engaged, keep each hand in the role it started
+    // with. Otherwise a click gesture that matches the arm gesture would let
+    // the steering hand be mistaken for the arming hand and swap the two.
+    if (this.pointerEngaged && this.lockedActionHand) {
+      const actionHandIndex = sample.hands.findIndex(
+        (h) => h.handedness && h.handedness === this.lockedActionHand,
+      )
+      const armHandIndex = sample.hands.findIndex(
+        (h, i) => i !== actionHandIndex && h.handedness && h.handedness === this.lockedArmHand,
+      )
+      if (actionHandIndex !== -1) {
+        const armOk = !settings.requireArmHand || gated[armHandIndex] === settings.armGesture
+        const raw = gated[actionHandIndex]
+        const clickHeld =
+          !!mouse?.clickEnabled &&
+          raw === mouse.clickGesture &&
+          this.sessionGesture !== null &&
+          mouse.clickGesture !== this.sessionGesture
+        return {
+          // A click must not end the session, so report the session's own
+          // gesture while the steering hand is clicking.
+          action: clickHeld ? this.sessionGesture : raw,
+          armed: armOk,
+          armHandIndex,
+          actionHandIndex,
+          clickHeld,
+        }
+      }
+    }
 
     if (!settings.requireArmHand) {
       // Highest-confidence hand wins when no guard is configured.
@@ -109,12 +178,18 @@ export class GestureEngine {
         if (gated[i] === null) continue
         if (best === -1 || sample.hands[i].confidence > sample.hands[best].confidence) best = i
       }
-      return { action: best === -1 ? null : gated[best], armed: true, armHandIndex: -1, actionHandIndex: best }
+      return {
+        action: best === -1 ? null : gated[best],
+        armed: true,
+        armHandIndex: -1,
+        actionHandIndex: best,
+        clickHeld: false,
+      }
     }
 
     const armHandIndex = gated.indexOf(settings.armGesture)
     if (armHandIndex === -1) {
-      return { action: null, armed: false, armHandIndex: -1, actionHandIndex: -1 }
+      return { action: null, armed: false, armHandIndex: -1, actionHandIndex: -1, clickHeld: false }
     }
 
     let actionHandIndex = -1
@@ -130,12 +205,13 @@ export class GestureEngine {
       armed: true,
       armHandIndex,
       actionHandIndex,
+      clickHeld: false,
     }
   }
 
   frame(sample: FrameSample): EngineFrameResult {
-    const { settings, mappings } = this.getOptions()
-    const resolution = this.resolve(sample, settings)
+    const { settings, mappings, mouse } = this.getOptions()
+    const resolution = this.resolve(sample, settings, mouse)
 
     // --- Smoothing: majority vote over a sliding window, with hysteresis.
     // The stable label only changes when a different label (or "nothing")
@@ -147,19 +223,42 @@ export class GestureEngine {
     if (this.buffer.length > windowSize) this.buffer.shift()
     const counts = new Map<GestureName | null, number>()
     for (const l of this.buffer) counts.set(l, (counts.get(l) ?? 0) + 1)
+
+    if (this.stable !== null && resolution.action === this.stable) {
+      this.lastStableSeenAt = sample.t
+    }
+
+    // A dropout is not a release. Hand tracking loses the hand for a few frames
+    // at a time, so once a gesture is established we hold it through gaps
+    // shorter than the tolerance. While a pointer session is engaged we also
+    // bridge over misreads as a *different* gesture, since pinched fingers are
+    // routinely misclassified — outside a pointer session, deliberately
+    // switching gesture should still take effect immediately.
+    const grace = Math.max(0, settings.gapToleranceMs)
+    let bridging = false
+
     for (const [l, count] of counts) {
-      if (l !== this.stable && count >= majorityNeeded) {
-        this.stable = l
+      if (l === this.stable || count < majorityNeeded) continue
+      const withinGrace = this.stable !== null && sample.t - this.lastStableSeenAt < grace
+      if (withinGrace && (l === null || this.pointerEngaged)) {
+        bridging = true
         break
       }
+      this.stable = l
+      this.lastStableSeenAt = sample.t
+      break
     }
 
     this.armBuffer.push(resolution.armed)
     if (this.armBuffer.length > windowSize) this.armBuffer.shift()
+    if (resolution.armed) this.lastArmedAt = sample.t
     const armedCount = this.armBuffer.filter(Boolean).length
     if (resolution.armed !== this.stableArmed) {
       const votes = resolution.armed ? armedCount : this.armBuffer.length - armedCount
-      if (votes >= majorityNeeded) this.stableArmed = resolution.armed
+      // The arm hand blinks out too; don't disarm on a momentary loss.
+      const armWithinGrace = !resolution.armed && sample.t - this.lastArmedAt < grace
+      if (votes >= majorityNeeded && !armWithinGrace) this.stableArmed = resolution.armed
+      else if (armWithinGrace) bridging = true
     }
 
     // --- Trigger state machine.
@@ -214,6 +313,38 @@ export class GestureEngine {
       if (isPointer && this.holding.firedThisHold) tracking = mapping
     }
 
+    // --- Click while steering.
+    // Requires a couple of consecutive frames so a single misread fist does not
+    // click, and requires returning to the steering gesture before clicking
+    // again — otherwise holding a fist would machine-gun clicks.
+    let click = false
+    if (tracking && resolution.clickHeld) {
+      this.clickFrames++
+      if (this.clickFrames >= 2 && !this.clickFired) {
+        click = true
+        this.clickFired = true
+      }
+    } else {
+      this.clickFrames = 0
+      if (!resolution.clickHeld) this.clickFired = false
+    }
+
+    // Lock hand roles for the life of a session; release them when it ends.
+    if (tracking) {
+      if (!this.pointerEngaged) {
+        this.sessionGesture = this.stable
+        this.lockedActionHand = sample.hands[resolution.actionHandIndex]?.handedness ?? null
+        this.lockedArmHand = sample.hands[resolution.armHandIndex]?.handedness ?? null
+      }
+    } else {
+      this.sessionGesture = null
+      this.lockedActionHand = null
+      this.lockedArmHand = null
+      this.clickFired = false
+    }
+
+    this.pointerEngaged = tracking !== null
+
     const state: EngineState = this.holding
       ? this.holding.firedThisHold
         ? 'cooldown'
@@ -225,11 +356,14 @@ export class GestureEngine {
       state,
       holdProgress,
       armed: this.stableArmed,
+      bridging,
       armHandIndex: resolution.armHandIndex,
       actionHandIndex: resolution.actionHandIndex,
       activeMapping: this.holding && mapping ? mapping : null,
       fired,
       tracking,
+      click,
+      clickHeld: resolution.clickHeld,
     }
   }
 }

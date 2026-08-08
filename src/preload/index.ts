@@ -9,6 +9,7 @@ const api: Api = {
   sendHotkey: (payload) => ipcRenderer.invoke('hotkey:send', payload),
   checkAccessibility: (prompt) => ipcRenderer.invoke('accessibility:check', prompt),
   moveCursor: (nx, ny) => ipcRenderer.invoke('mouse:move', nx, ny),
+  clickCursor: () => ipcRenderer.invoke('mouse:click'),
   stopCursor: () => ipcRenderer.invoke('mouse:stop'),
   pointerAvailable: () => ipcRenderer.invoke('mouse:available'),
   listDisplays: () => ipcRenderer.invoke('displays:list'),

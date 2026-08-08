@@ -334,6 +334,23 @@ body {
   border-color: var(--green);
 }
 
+.gesture-chip.bridging {
+  border-style: dashed;
+}
+
+.bridge-tag {
+  margin-left: 7px;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--amber);
+  background: var(--amber-soft);
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: middle;
+}
+
 .chip-emoji {
   font-size: 28px;
   line-height: 1;

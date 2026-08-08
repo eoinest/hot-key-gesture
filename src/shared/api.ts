@@ -16,6 +16,7 @@ export interface Api {
   checkAccessibility: (prompt: boolean) => Promise<boolean>
   /** Returns null on success, or an error string. */
   moveCursor: (nx: number, ny: number) => Promise<string | null>
+  clickCursor: () => Promise<string | null>
   stopCursor: () => Promise<void>
   pointerAvailable: () => Promise<boolean>
   listDisplays: () => Promise<DisplayInfo[]>
