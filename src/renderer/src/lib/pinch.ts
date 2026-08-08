@@ -21,6 +21,17 @@ function dist(a: Point3, b: Point3): number {
  * the built-in classifier reports no gesture. Distance is normalized by palm
  * length so it is scale-invariant with respect to hand distance from camera.
  */
+/**
+ * The point the cursor should follow: midway between thumb and index tips,
+ * i.e. where the pinch visually "is". Returns normalized image coordinates.
+ */
+export function pinchPoint(landmarks: Point3[]): { x: number; y: number } | null {
+  if (!landmarks || landmarks.length < 21) return null
+  const a = landmarks[THUMB_TIP]
+  const b = landmarks[INDEX_TIP]
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+}
+
 export function detectPinch(landmarks: Point3[]): { pinch: boolean; confidence: number } {
   if (!landmarks || landmarks.length < 21) return { pinch: false, confidence: 0 }
   const palm = dist(landmarks[WRIST], landmarks[MIDDLE_MCP])

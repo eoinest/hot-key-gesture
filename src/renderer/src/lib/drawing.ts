@@ -67,6 +67,8 @@ export function drawOverlay(
   mirror: boolean,
   engine: EngineFrameResult,
   showProgress: boolean,
+  /** Normalized 0..1 cursor target while pointer control is engaged. */
+  pointer: { x: number; y: number } | null = null,
 ): void {
   const dpr = window.devicePixelRatio || 1
   const elemW = canvas.clientWidth
@@ -119,6 +121,35 @@ export function drawOverlay(
       ctx.fillText('ARMED', top.x, top.y - 14)
     }
   })
+
+  // Pointer control: show the mapped screen area and where the cursor is going.
+  if (pointer) {
+    ctx.save()
+    ctx.strokeStyle = 'rgba(74, 222, 128, 0.35)'
+    ctx.setLineDash([6, 6])
+    ctx.lineWidth = 2
+    ctx.strokeRect(elemW * 0.04, elemH * 0.04, elemW * 0.92, elemH * 0.92)
+    ctx.restore()
+
+    const px = elemW * pointer.x
+    const py = elemH * pointer.y
+    ctx.strokeStyle = FIRED
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(px - 12, py)
+    ctx.lineTo(px + 12, py)
+    ctx.moveTo(px, py - 12)
+    ctx.lineTo(px, py + 12)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(px, py, 7, 0, Math.PI * 2)
+    ctx.stroke()
+
+    ctx.fillStyle = FIRED
+    ctx.font = 'bold 12px system-ui'
+    ctx.textAlign = 'center'
+    ctx.fillText('CURSOR', px, py + 28)
+  }
 
   if (!showProgress || engine.state === 'idle' || !actionPts) return
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { GESTURE_INFO } from '../../shared/gestures'
 import { formatHotkey } from '../../shared/hotkeys'
 import type { AppConfig, AppMode, GestureMapping } from '../../shared/types'
+import type { DisplayInfo } from '../../shared/api'
 import { ActivityPanel } from './components/ActivityPanel'
 import type { LogEntry } from './components/ActivityPanel'
 import { CameraPanel } from './components/CameraPanel'
@@ -32,6 +33,8 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('gestures')
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
+  const [displays, setDisplays] = useState<DisplayInfo[]>([])
+  const [pointerAvailable, setPointerAvailable] = useState(true)
   const [accessibilityOk, setAccessibilityOk] = useState(true)
   const logId = useRef(0)
   const platform = window.api.platform
@@ -73,7 +76,14 @@ export default function App() {
     if (platform === 'darwin') {
       void window.api.checkAccessibility(false).then(setAccessibilityOk)
     }
-  }, [platform])
+    void window.api.listDisplays().then(setDisplays)
+    void window.api.pointerAvailable().then((ok) => {
+      setPointerAvailable(ok)
+      if (!ok) {
+        addLog('info', 'Cursor helper not built — pointer gestures will not move the mouse.')
+      }
+    })
+  }, [platform, addLog])
 
   const refreshDevices = useCallback(async () => {
     try {
@@ -98,15 +108,32 @@ export default function App() {
   const handleFired = useCallback(
     (mapping: GestureMapping, mode: AppMode) => {
       const info = GESTURE_INFO[mapping.gesture]
-      const combo = formatHotkey(mapping.hotkey, platform)
       const { enabled, volume } = soundRef.current
+
+      if (mapping.action === 'mouse') {
+        if (enabled) playBoop(volume)
+        addLog(
+          mode === 'test' ? 'test' : 'live',
+          `${info?.emoji ?? ''} ${info?.label ?? mapping.gesture} → cursor control ${
+            mode === 'test' ? 'engaged (test — cursor not moved)' : 'engaged'
+          }`,
+        )
+        return
+      }
+
+      if (!mapping.hotkey) {
+        addLog('error', `${info?.label ?? mapping.gesture} has no shortcut set.`)
+        return
+      }
+      const hotkey = mapping.hotkey
+      const combo = formatHotkey(hotkey, platform)
       if (mode === 'test') {
         if (enabled) playBoop(volume)
         addLog('test', `${info?.emoji ?? ''} ${info?.label ?? mapping.gesture} → ${combo} (test — not sent)`)
         return
       }
       void window.api
-        .sendHotkey({ hotkey: mapping.hotkey, gesture: mapping.gesture, mappingId: mapping.id })
+        .sendHotkey({ hotkey, gesture: mapping.gesture, mappingId: mapping.id })
         .then((result) => {
           if (result.ok) {
             if (enabled) playBoop(volume)
@@ -250,10 +277,14 @@ export default function App() {
                 engine={config.engine}
                 camera={config.camera}
                 sound={config.sound}
+                mouse={config.mouse}
                 devices={devices}
+                displays={displays}
+                pointerAvailable={pointerAvailable}
                 onEngineChange={(engine) => setConfig({ ...config, engine })}
                 onCameraChange={(camera) => setConfig({ ...config, camera })}
                 onSoundChange={(sound) => setConfig({ ...config, sound })}
+                onMouseChange={(mouse) => setConfig({ ...config, mouse })}
               />
             )}
             {tab === 'activity' && <ActivityPanel logs={logs} onClear={() => setLogs([])} />}

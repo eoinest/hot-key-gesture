@@ -37,6 +37,12 @@ export interface EngineFrameResult {
   activeMapping: GestureMapping | null
   /** Set on the exact frame a trigger fires. */
   fired: GestureMapping | null
+  /**
+   * Set every frame while a pointer-control mapping is engaged. Unlike
+   * `fired`, this is continuous: the cursor should follow the acting hand for
+   * as long as this is non-null.
+   */
+  tracking: GestureMapping | null
 }
 
 export interface EngineOptions {
@@ -174,21 +180,24 @@ export class GestureEngine {
     }
 
     let fired: GestureMapping | null = null
+    let tracking: GestureMapping | null = null
     let holdProgress = 0
 
     if (this.holding && mapping) {
+      const isPointer = mapping.action === 'mouse'
       const holdMs = mapping.holdMs ?? settings.holdMs
       const cooldownMs = mapping.cooldownMs ?? settings.cooldownMs
       const elapsed = sample.t - this.holding.since
       const lastFired = this.lastFiredAt.get(this.holding.gesture)
       const cooledDown = lastFired === undefined || sample.t - lastFired >= cooldownMs
-      const blockedByRelease = this.holding.firedThisHold && settings.requireRelease
+      // Pointer control engages once and then stays engaged, so it behaves
+      // like requireRelease regardless of the repeat setting.
+      const blockedByRelease =
+        this.holding.firedThisHold && (settings.requireRelease || isPointer)
 
       if (this.holding.firedThisHold) {
-        // Already fired this hold: show progress toward the next repeat.
-        holdProgress = settings.requireRelease
-          ? 1
-          : lastFired === undefined
+        holdProgress =
+          isPointer || settings.requireRelease || lastFired === undefined
             ? 1
             : Math.min(1, (sample.t - lastFired) / Math.max(1, cooldownMs))
       } else {
@@ -199,8 +208,10 @@ export class GestureEngine {
         fired = mapping
         this.lastFiredAt.set(this.holding.gesture, sample.t)
         this.holding.firedThisHold = true
-        holdProgress = settings.requireRelease ? 1 : 0
+        holdProgress = isPointer || settings.requireRelease ? 1 : 0
       }
+
+      if (isPointer && this.holding.firedThisHold) tracking = mapping
     }
 
     const state: EngineState = this.holding
@@ -218,6 +229,7 @@ export class GestureEngine {
       actionHandIndex: resolution.actionHandIndex,
       activeMapping: this.holding && mapping ? mapping : null,
       fired,
+      tracking,
     }
   }
 }

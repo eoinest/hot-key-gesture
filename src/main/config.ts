@@ -1,8 +1,8 @@
 import { app } from 'electron'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { CONFIG_VERSION, defaultConfig } from '../shared/types'
-import type { AppConfig } from '../shared/types'
+import { CONFIG_VERSION, defaultConfig, defaultPinchMouseMapping } from '../shared/types'
+import type { AppConfig, GestureMapping } from '../shared/types'
 
 export function configPath(): string {
   return join(app.getPath('userData'), 'config.json')
@@ -26,12 +26,26 @@ export function loadConfig(): AppConfig {
       version: CONFIG_VERSION,
       camera: { ...defaults.camera, ...raw.camera },
       sound: { ...defaults.sound, ...raw.sound },
+      mouse: { ...defaults.mouse, ...raw.mouse },
       engine,
-      mappings: Array.isArray(raw.mappings) && raw.mappings.length ? raw.mappings : defaults.mappings,
+      mappings: withPointerMapping(
+        Array.isArray(raw.mappings) && raw.mappings.length ? raw.mappings : defaults.mappings,
+      ),
     }
   } catch {
     return defaults
   }
+}
+
+/**
+ * Give configs written before pointer control a Pinch→cursor mapping, without
+ * touching anything the user set up. Skipped if Pinch is already mapped.
+ */
+function withPointerMapping(mappings: GestureMapping[]): GestureMapping[] {
+  const hasPointer = mappings.some((m) => m.action === 'mouse')
+  const hasPinch = mappings.some((m) => m.gesture === 'Pinch')
+  if (hasPointer || hasPinch) return mappings
+  return [...mappings, defaultPinchMouseMapping()]
 }
 
 export function saveConfig(config: AppConfig): void {

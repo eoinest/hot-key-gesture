@@ -12,6 +12,8 @@ import { pathToFileURL } from 'node:url'
 import { writeFile } from 'node:fs/promises'
 import { loadConfig, saveConfig } from './config'
 import { sendHotkey } from './keysender'
+import { listDisplays, moveCursorNormalized, pointerAvailable, stopPointer } from './mouse'
+import type { DisplayInfo } from './mouse'
 import { CONFIG_VERSION } from '../shared/types'
 import type { AppConfig, AppMode, TriggerPayload, TriggerResult } from '../shared/types'
 import { isValidHotkey } from '../shared/hotkeys'
@@ -102,6 +104,8 @@ function registerIpc(): void {
 
   ipcMain.handle('mode:set', (_event, mode: AppMode) => {
     if (!['paused', 'test', 'live'].includes(mode)) throw new Error(`Invalid mode: ${mode}`)
+    // Never leave the cursor helper running once we are out of live mode.
+    if (mode !== 'live') stopPointer()
     config = { ...config, mode }
     saveConfig(config)
   })
@@ -123,6 +127,20 @@ function registerIpc(): void {
       return sendHotkey(payload.hotkey)
     },
   )
+
+  ipcMain.handle('mouse:move', (_event, nx: number, ny: number): string | null => {
+    if (config.mode !== 'live') return 'Not in live mode'
+    if (!Number.isFinite(nx) || !Number.isFinite(ny)) return 'Invalid coordinates'
+    return moveCursorNormalized(nx, ny, config.mouse)
+  })
+
+  ipcMain.handle('mouse:stop', () => {
+    stopPointer()
+  })
+
+  ipcMain.handle('mouse:available', (): boolean => pointerAvailable())
+
+  ipcMain.handle('displays:list', (): DisplayInfo[] => listDisplays())
 
   ipcMain.handle('accessibility:check', (_event, prompt: boolean): boolean => {
     if (process.platform !== 'darwin') return true
@@ -168,4 +186,8 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   app.quit()
+})
+
+app.on('before-quit', () => {
+  stopPointer()
 })

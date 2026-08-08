@@ -1,9 +1,11 @@
 import { GESTURES } from '../../../shared/gestures'
 import { DEFAULT_ENGINE_SETTINGS } from '../../../shared/types'
+import type { DisplayInfo } from '../../../shared/api'
 import type {
   CameraSettings,
   EngineSettings,
   GestureName,
+  MouseSettings,
   SoundSettings,
 } from '../../../shared/types'
 import { playBoop } from '../lib/sound'
@@ -12,10 +14,14 @@ interface SettingsPanelProps {
   engine: EngineSettings
   camera: CameraSettings
   sound: SoundSettings
+  mouse: MouseSettings
   devices: MediaDeviceInfo[]
+  displays: DisplayInfo[]
+  pointerAvailable: boolean
   onEngineChange: (engine: EngineSettings) => void
   onCameraChange: (camera: CameraSettings) => void
   onSoundChange: (sound: SoundSettings) => void
+  onMouseChange: (mouse: MouseSettings) => void
 }
 
 interface SliderRowProps {
@@ -77,10 +83,14 @@ export function SettingsPanel({
   engine,
   camera,
   sound,
+  mouse,
   devices,
+  displays,
+  pointerAvailable,
   onEngineChange,
   onCameraChange,
   onSoundChange,
+  onMouseChange,
 }: SettingsPanelProps) {
   const set = (patch: Partial<EngineSettings>) => onEngineChange({ ...engine, ...patch })
 
@@ -200,6 +210,56 @@ export function SettingsPanel({
           </button>
         </div>
       </div>
+
+      <h3 className="settings-heading">Cursor control</h3>
+      {!pointerAvailable && (
+        <p className="setting-warning">
+          The cursor helper isn’t built, so pointer gestures won’t move the mouse. Run{' '}
+          <code>npm run build-helper</code> (needs Xcode command line tools).
+        </p>
+      )}
+      <div className={`setting-row ${pointerAvailable ? '' : 'setting-disabled'}`}>
+        <div className="setting-text">
+          <label>Display</label>
+          <p>Which screen the camera frame maps onto.</p>
+        </div>
+        <select
+          className="device-select"
+          disabled={!pointerAvailable}
+          value={mouse.displayId ?? ''}
+          onChange={(e) =>
+            onMouseChange({ ...mouse, displayId: e.target.value ? Number(e.target.value) : null })
+          }
+        >
+          <option value="">Primary display</option>
+          {displays.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.label}
+              {d.primary ? ' (primary)' : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+      <SliderRow
+        label="Reach"
+        hint="How much of the camera frame maps to the whole screen. Higher reach means smaller hand movements cover more ground."
+        value={mouse.margin}
+        min={0}
+        max={0.35}
+        step={0.05}
+        format={(v) => `${Math.round((1 - v * 2) * 100)}% of frame`}
+        onChange={(margin) => onMouseChange({ ...mouse, margin })}
+      />
+      <SliderRow
+        label="Cursor smoothing"
+        hint="Higher is steadier against hand shake but lags behind your hand more."
+        value={mouse.smoothing}
+        min={0}
+        max={0.9}
+        step={0.05}
+        format={(v) => `${Math.round(v * 100)}%`}
+        onChange={(smoothing) => onMouseChange({ ...mouse, smoothing })}
+      />
 
       <h3 className="settings-heading">Camera</h3>
       <div className="setting-row">

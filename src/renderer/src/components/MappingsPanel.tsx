@@ -1,5 +1,10 @@
 import { GESTURES, GESTURE_INFO } from '../../../shared/gestures'
-import type { GestureMapping, GestureName, Hotkey } from '../../../shared/types'
+import type {
+  GestureMapping,
+  GestureName,
+  Hotkey,
+  MappingActionKind,
+} from '../../../shared/types'
 import { HotkeyRecorder } from './HotkeyRecorder'
 
 interface MappingsPanelProps {
@@ -39,7 +44,7 @@ export function MappingsPanel({
     const gesture = GESTURES.find((g) => !used.has(g.name))?.name ?? 'Open_Palm'
     onChange([
       ...mappings,
-      { id: newId(), gesture, hotkey: { key: '', modifiers: [] }, enabled: true },
+      { id: newId(), gesture, action: 'hotkey', hotkey: { key: '', modifiers: [] }, enabled: true },
     ])
   }
 
@@ -88,11 +93,30 @@ export function MappingsPanel({
               ))}
             </select>
             <span className="mapping-arrow">→</span>
-            <HotkeyRecorder
-              value={m.hotkey}
-              platform={platform}
-              onChange={(hotkey: Hotkey) => update(m.id, { hotkey })}
-            />
+            <select
+              className="action-select"
+              value={m.action ?? 'hotkey'}
+              title={
+                (m.action ?? 'hotkey') === 'mouse'
+                  ? 'Steers the cursor while held'
+                  : 'Presses a keyboard shortcut'
+              }
+              onChange={(e) => update(m.id, { action: e.target.value as MappingActionKind })}
+            >
+              <option value="hotkey">⌨️</option>
+              <option value="mouse">🖱️</option>
+            </select>
+            {(m.action ?? 'hotkey') === 'mouse' ? (
+              <span className="mouse-action" title="The cursor follows this hand's pinch point while you hold it">
+                Move cursor
+              </span>
+            ) : (
+              <HotkeyRecorder
+                value={m.hotkey ?? { key: '', modifiers: [] }}
+                platform={platform}
+                onChange={(hotkey: Hotkey) => update(m.id, { hotkey })}
+              />
+            )}
             {shadowed && (
               <span className="warn-dot" title="Another enabled row already maps this gesture — the first one wins.">
                 ⚠️
