@@ -102,12 +102,19 @@ export interface MouseSettings {
    * display by id, null means the primary display.
    */
   displayId: number | 'all' | null
-  /** Click when the steering hand switches to `clickGesture` mid-session. */
+  /** Click during a pointer session. */
   clickEnabled: boolean
   /**
-   * Gesture that clicks while pointer control is engaged. It may equal the
-   * arm gesture — hand roles are locked for the duration of a session, so a
-   * fist on the steering hand is unambiguous.
+   * 'pinky' clicks when the steering hand raises its pinky while staying
+   * pinched — the pinch point barely moves, so the cursor doesn't lurch at the
+   * moment of the click. 'gesture' switches the whole hand to `clickGesture`,
+   * which is more obvious but drags the cursor as the hand changes shape.
+   */
+  clickMode: 'pinky' | 'gesture'
+  /**
+   * Gesture that clicks in 'gesture' mode. It may equal the arm gesture — hand
+   * roles are locked for the duration of a session, so a fist on the steering
+   * hand is unambiguous.
    */
   clickGesture: GestureName
 }
@@ -119,6 +126,7 @@ export const DEFAULT_MOUSE_SETTINGS: MouseSettings = {
   // the only thing that works on more than one, so it is the better default.
   displayId: 'all',
   clickEnabled: true,
+  clickMode: 'pinky',
   clickGesture: 'Closed_Fist',
 }
 

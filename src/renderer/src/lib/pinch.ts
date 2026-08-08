@@ -21,6 +21,32 @@ function dist(a: Point3, b: Point3): number {
   return Math.hypot(a.x - b.x, a.y - b.y)
 }
 
+const PINKY_TIP = 20
+const RING_TIP = 16
+
+/**
+ * Is the pinky deliberately raised, while the rest of the hand stays pinched?
+ *
+ * Measured by how far the pinky tip reaches compared with the ring finger next
+ * to it, which is the only signal that came out cleanly bimodal on real hands:
+ * curled clusters around 0.71–0.86 and raised around 1.06–1.12, with an empty
+ * gap between. Absolute pinky length does *not* separate the two — a pinch
+ * curls the pinky far enough that its length overlaps the raised case.
+ *
+ * Thresholds straddle that gap, with hysteresis so a held pinky doesn't
+ * flutter across the boundary.
+ */
+const PINKY_RAISE_RATIO = 1.02
+const PINKY_LOWER_RATIO = 0.92
+
+export function pinkyRaised(landmarks: Point3[], wasRaised = false): boolean {
+  if (!landmarks || landmarks.length < 21) return false
+  const ring = dist(landmarks[WRIST], landmarks[RING_TIP])
+  if (ring <= 0) return false
+  const vsRing = dist(landmarks[WRIST], landmarks[PINKY_TIP]) / ring
+  return vsRing > (wasRaised ? PINKY_LOWER_RATIO : PINKY_RAISE_RATIO)
+}
+
 /**
  * Apparent size of a hand, as the span of its landmarks. A hand close to the
  * camera measures larger, which is how the user's own hands are told apart
