@@ -35,7 +35,25 @@ hand tracking). No frames or data ever leave your machine.
 - **Three modes** — **Paused** (preview only), **Test** (full pipeline, keystrokes simulated —
   great for practicing), **Live** (real keystrokes).
 
-## Quick start
+## Install it as an app
+
+Build a real `.app` you can launch from Spotlight or the Applications folder:
+
+```bash
+npm install
+npm run dist
+cp -R "dist/mac-arm64/HotKey Gesture.app" /Applications/
+```
+
+Then hit ⌘-Space and type "HotKey Gesture". The bundle is self-contained — model,
+wasm runtime, and cursor helper all ship inside it.
+
+The build is unsigned, so if macOS refuses to open it, right-click the app → **Open** once
+(or run `xattr -dr com.apple.quarantine "/Applications/HotKey Gesture.app"`). Grant Camera and
+Accessibility when asked; those permissions are per-app, so the installed app asks for its own
+even if you already granted them while developing.
+
+## Run it from source
 
 ```bash
 npm install        # also downloads the gesture model (~8 MB) via postinstall

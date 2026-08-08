@@ -14,7 +14,7 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
-    "dist": "npm run build && electron-builder",
+    "dist": "npm run build && npm run build-helper && node scripts/build-icon.mjs && electron-builder",
     "postinstall": "node scripts/setup-assets.mjs && node scripts/build-helper.mjs",
     "smoke": "npm run build && electron . --smoke",
     "build-helper": "node scripts/build-helper.mjs"
