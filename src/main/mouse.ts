@@ -29,27 +29,45 @@ export function pointerAvailable(): boolean {
   return existsSync(helperPath())
 }
 
+/**
+ * A failure must not be permanent. The helper can die for transient reasons —
+ * a broken pipe, the OS reaping it — and pointer control silently never
+ * recovering for the rest of the session is worse than retrying. Only a
+ * genuinely missing binary is treated as fatal.
+ */
+const RESPAWN_BACKOFF_MS = 1000
+let lastSpawnAttempt = 0
+let helperMissing = false
+
 function ensureHelper(): MouseHelper | null {
   if (helper && !helper.killed) return helper
-  if (spawnFailed) return null
+  if (helperMissing) return null
+
   const path = helperPath()
   if (!existsSync(path)) {
+    helperMissing = true
     spawnFailed = 'Cursor helper is not built. Run `npm run build-helper`.'
     return null
   }
+
+  // Back off between attempts so a failing helper can't be respawned at frame rate.
+  const now = Date.now()
+  if (now - lastSpawnAttempt < RESPAWN_BACKOFF_MS) return null
+  lastSpawnAttempt = now
+
   try {
     const proc: MouseHelper = spawn(path, { stdio: ['pipe', 'ignore', 'pipe'] })
-    proc.on('exit', () => {
+    const forget = () => {
       if (helper === proc) helper = null
-    })
+    }
+    proc.on('exit', forget)
     proc.on('error', (err) => {
       spawnFailed = err.message
-      if (helper === proc) helper = null
+      forget()
     })
-    proc.stdin.on('error', () => {
-      if (helper === proc) helper = null
-    })
+    proc.stdin.on('error', forget)
     helper = proc
+    spawnFailed = null
     return proc
   } catch (err) {
     spawnFailed = err instanceof Error ? err.message : String(err)

@@ -153,6 +153,23 @@ export function SettingsPanel({
       />
 
       <h3 className="settings-heading">Recognition</h3>
+      <div className="setting-row">
+        <div className="setting-text">
+          <label>Hands to look for</label>
+          <p>
+            Only the two nearest the camera are used. Searching for more costs frame rate — raise
+            it only if someone else’s hands keep taking a slot.
+          </p>
+        </div>
+        <select
+          className="device-select"
+          value={engine.maxHands}
+          onChange={(e) => set({ maxHands: Number(e.target.value) as 2 | 4 })}
+        >
+          <option value={2}>2 — faster</option>
+          <option value={4}>4 — busy room</option>
+        </select>
+      </div>
       <SliderRow
         label="Dropout tolerance"
         hint="How long a gesture survives when tracking briefly loses your hand. Raise it if the pinch keeps letting go; lower it if gestures linger after you stop."

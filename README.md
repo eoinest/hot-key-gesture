@@ -99,6 +99,10 @@ Tunables in **Settings**:
 - **Confidence threshold** (default 55%) and **smoothing** (default 5 frames): the detected
   gesture only changes when a new label wins a majority of the sliding window, so single
   misclassified frames are ignored.
+- **Hands to look for** (default 2): only the two hands nearest the camera are ever used, but
+  MediaPipe re-runs palm detection every frame while it has found fewer hands than its limit,
+  so searching for 4 costs frame rate. Raise it to 4 only if other people's hands in shot keep
+  taking a slot from you.
 - **Dropout tolerance** (default 400 ms): hand tracking loses the hand for a few frames at a
   time, especially mid-pinch where the fingers occlude each other. A dropout shorter than this
   is bridged rather than treated as a release, so a blink doesn't cost you a whole re-hold. The

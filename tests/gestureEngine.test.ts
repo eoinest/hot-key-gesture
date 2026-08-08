@@ -20,6 +20,7 @@ const SETTINGS: EngineSettings = {
   // Off by default in tests so each case isolates one behaviour; the bridging
   // suite below opts in.
   gapToleranceMs: 0,
+  maxHands: 2,
 }
 
 const THUMB_UP_MAPPING: GestureMapping = {

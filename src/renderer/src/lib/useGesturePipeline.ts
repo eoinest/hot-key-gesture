@@ -81,6 +81,7 @@ export function useGesturePipeline({
   const wasTracking = useRef(false)
   const wasPinching = useRef<boolean[]>([])
   const wasPinkyUp = useRef<boolean[]>([])
+  const lastCursorError = useRef<string | null>(null)
 
   const engineRef = useRef<GestureEngine | null>(null)
   if (!engineRef.current) {
@@ -93,15 +94,19 @@ export function useGesturePipeline({
     }))
   }
 
-  // Load the hand-tracking model once.
+  // Load the hand-tracking model, and rebuild it if the hand limit changes —
+  // numHands is fixed at construction time.
+  const maxHands = config?.engine.maxHands ?? 2
   useEffect(() => {
     let cancelled = false
-    createGestureRecognizer()
+    setRecognizerStatus('loading')
+    createGestureRecognizer(maxHands)
       .then((recognizer) => {
         if (cancelled) {
           recognizer.close()
           return
         }
+        recognizerRef.current?.close()
         recognizerRef.current = recognizer
         setRecognizerStatus('ready')
       })
@@ -113,10 +118,16 @@ export function useGesturePipeline({
       })
     return () => {
       cancelled = true
+    }
+  }, [maxHands])
+
+  useEffect(
+    () => () => {
       recognizerRef.current?.close()
       recognizerRef.current = null
-    }
-  }, [])
+    },
+    [],
+  )
 
   // Start (and restart) the camera when the configured device changes.
   const configLoaded = !!config
@@ -274,7 +285,18 @@ export function useGesturePipeline({
             ? { x: prev.x + (nx - prev.x) * a, y: prev.y + (ny - prev.y) * a }
             : { x: nx, y: ny }
           smoothedPointer.current = pointer
-          if (cfg.mode === 'live') void window.api.moveCursor(pointer.x, pointer.y)
+          if (cfg.mode === 'live') {
+            // Surface a failing cursor helper instead of the pointer silently
+            // going dead. Reported once per outage, not once per frame.
+            void window.api.moveCursor(pointer.x, pointer.y).then((error) => {
+              if (error && error !== lastCursorError.current) {
+                lastCursorError.current = error
+                onLogRef.current('error', `Cursor control failed: ${error}`)
+              } else if (!error) {
+                lastCursorError.current = null
+              }
+            })
+          }
         }
       } else if (!frame.tracking && wasTracking.current) {
         smoothedPointer.current = null

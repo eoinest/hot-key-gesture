@@ -68,6 +68,13 @@ export interface EngineSettings {
    * costs a full re-hold.
    */
   gapToleranceMs: number
+  /**
+   * How many hands the recognizer looks for. Only the two nearest the camera
+   * are ever used; searching for more costs frame rate, because MediaPipe
+   * re-runs palm detection every frame while it has fewer hands than this.
+   * Raise it only if other people's hands keep stealing a slot.
+   */
+  maxHands: 2 | 4
 }
 
 export interface CameraSettings {
@@ -174,6 +181,7 @@ export const DEFAULT_ENGINE_SETTINGS: EngineSettings = {
   requireArmHand: true,
   armGesture: 'Closed_Fist',
   gapToleranceMs: 400,
+  maxHands: 2,
 }
 
 export function defaultConfig(): AppConfig {
