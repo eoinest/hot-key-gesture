@@ -6,7 +6,7 @@ import { isValidHotkey } from '../../../shared/hotkeys'
 import { DEFAULT_ENGINE_SETTINGS } from '../../../shared/types'
 import type { AppConfig, AppMode, GestureMapping, GestureName } from '../../../shared/types'
 import { createGestureRecognizer } from './recognizer'
-import { detectPinch } from './pinch'
+import { detectPinch, pinchPoint } from './pinch'
 import { drawOverlay } from './drawing'
 
 export interface Hud {
@@ -22,6 +22,10 @@ export interface Hud {
 }
 
 export type RecognizerStatus = 'loading' | 'ready' | 'error'
+
+function clamp01(v: number): number {
+  return v < 0 ? 0 : v > 1 ? 1 : v
+}
 
 export interface LogFn {
   (kind: 'live' | 'test' | 'error' | 'info', message: string): void
@@ -61,11 +65,16 @@ export function useGesturePipeline({ config, configRef, onFired, onLog }: Pipeli
     onLogRef.current = onLog
   })
 
+  const smoothedPointer = useRef<{ x: number; y: number } | null>(null)
+  const wasTracking = useRef(false)
+
   const engineRef = useRef<GestureEngine | null>(null)
   if (!engineRef.current) {
     engineRef.current = new GestureEngine(() => ({
       settings: configRef.current?.engine ?? DEFAULT_ENGINE_SETTINGS,
-      mappings: (configRef.current?.mappings ?? []).filter((m) => isValidHotkey(m.hotkey)),
+      mappings: (configRef.current?.mappings ?? []).filter(
+        (m) => m.action === 'mouse' || isValidHotkey(m.hotkey),
+      ),
     }))
   }
 
@@ -193,7 +202,42 @@ export function useGesturePipeline({ config, configRef, onFired, onLog }: Pipeli
       })
 
       const frame = engine.frame({ hands, t })
-      drawOverlay(canvas, video, allLandmarks, cfg.camera.mirror, frame, cfg.mode !== 'paused')
+
+      // --- Pointer control: steer the cursor from the acting hand's pinch.
+      let pointer: { x: number; y: number } | null = null
+      if (frame.tracking && frame.actionHandIndex >= 0) {
+        const raw = pinchPoint(allLandmarks[frame.actionHandIndex])
+        if (raw) {
+          // Match what the user sees: with a mirrored preview, moving the hand
+          // right must move the cursor right.
+          const seenX = cfg.camera.mirror ? 1 - raw.x : raw.x
+          const { margin, smoothing } = cfg.mouse
+          const span = Math.max(0.05, 1 - margin * 2)
+          const nx = clamp01((seenX - margin) / span)
+          const ny = clamp01((raw.y - margin) / span)
+          const prev = smoothedPointer.current
+          const a = 1 - Math.min(0.95, Math.max(0, smoothing))
+          pointer = prev
+            ? { x: prev.x + (nx - prev.x) * a, y: prev.y + (ny - prev.y) * a }
+            : { x: nx, y: ny }
+          smoothedPointer.current = pointer
+          if (cfg.mode === 'live') void window.api.moveCursor(pointer.x, pointer.y)
+        }
+      } else if (smoothedPointer.current) {
+        smoothedPointer.current = null
+        if (wasTracking.current) void window.api.stopCursor()
+      }
+      wasTracking.current = !!frame.tracking
+
+      drawOverlay(
+        canvas,
+        video,
+        allLandmarks,
+        cfg.camera.mirror,
+        frame,
+        cfg.mode !== 'paused',
+        pointer,
+      )
 
       if (frame.fired && cfg.mode !== 'paused') {
         setFlashToken((n) => n + 1)

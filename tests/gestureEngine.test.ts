@@ -246,6 +246,59 @@ describe('two-hand safety guard', () => {
   })
 })
 
+describe('pointer-control mappings', () => {
+  const POINTER_MAPPING: GestureMapping = {
+    id: 'mouse1',
+    gesture: 'Pinch',
+    action: 'mouse',
+    enabled: true,
+  }
+
+  it('does not engage before the hold completes', () => {
+    const { engine } = makeEngine(undefined, [POINTER_MAPPING])
+    const results = feed1(engine, 'Pinch', 5, 0)
+    expect(results.every((r) => r.tracking === null)).toBe(true)
+  })
+
+  it('engages once and then tracks continuously while held', () => {
+    const { engine } = makeEngine(undefined, [POINTER_MAPPING])
+    const results = feed1(engine, 'Pinch', 40, 0)
+    expect(results.filter((r) => r.fired)).toHaveLength(1)
+    const tracked = results.filter((r) => r.tracking !== null)
+    expect(tracked.length).toBeGreaterThan(20)
+    // Every frame after engagement keeps tracking.
+    const firstTracked = results.findIndex((r) => r.tracking !== null)
+    expect(results.slice(firstTracked).every((r) => r.tracking !== null)).toBe(true)
+  })
+
+  it('never auto-repeats even with requireRelease off', () => {
+    const { engine } = makeEngine({ requireRelease: false }, [POINTER_MAPPING])
+    // A hotkey mapping would fire repeatedly over this span.
+    expect(feed1(engine, 'Pinch', 120, 0).filter((r) => r.fired)).toHaveLength(1)
+  })
+
+  it('stops tracking as soon as the gesture is released', () => {
+    const { engine } = makeEngine(undefined, [POINTER_MAPPING])
+    expect(feed1(engine, 'Pinch', 30, 0).at(-1)!.tracking).not.toBeNull()
+    const released = feed1(engine, null, 10, 1000)
+    expect(released.at(-1)!.tracking).toBeNull()
+  })
+
+  it('respects the safety guard', () => {
+    const { engine } = makeEngine({ requireArmHand: true }, [POINTER_MAPPING])
+    expect(feed(engine, [hand('Pinch')], 40, 0).every((r) => r.tracking === null)).toBe(true)
+    expect(feed(engine, [hand('Closed_Fist'), hand('Pinch')], 40, 2000).at(-1)!.tracking).not.toBeNull()
+  })
+
+  it('reports the acting hand so the caller knows which hand steers', () => {
+    const { engine } = makeEngine({ requireArmHand: true }, [POINTER_MAPPING])
+    const results = feed(engine, [hand('Closed_Fist'), hand('Pinch')], 40, 0)
+    const last = results.at(-1)!
+    expect(last.actionHandIndex).toBe(1)
+    expect(last.armHandIndex).toBe(0)
+  })
+})
+
 describe('reset', () => {
   it('clears all state', () => {
     const { engine } = makeEngine()

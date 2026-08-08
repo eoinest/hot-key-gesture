@@ -14,6 +14,9 @@ hand tracking). No frames or data ever leave your machine.
   movement in front of your webcam can't trigger anything.
 - **8 gestures out of the box** — ✋ open palm, ✊ fist, ☝️ point up, 👍 thumbs up, 👎 thumbs
   down, ✌️ peace, 🤟 rock on, plus a landmark-derived 🤏 pinch.
+- **Move the mouse with your hand** — map a gesture (🤏 pinch by default) to *cursor control*
+  instead of a shortcut. Hold it and the pointer follows your pinch around the screen, with
+  configurable reach, smoothing, and target display. Release to hand the mouse back.
 - **Fully configurable** — map any gesture to any shortcut with a click-to-record hotkey
   field, enable/disable rows, add/remove mappings. Tuning knobs for the arm gesture, hold
   time, repeat interval, confidence threshold, and smoothing. The guard can be switched off
@@ -38,7 +41,9 @@ npm run dev
 ```
 
 Requires Node 20+. The first run downloads the MediaPipe gesture model into
-`src/renderer/public/models/` (re-run manually anytime with `npm run setup-assets`).
+`src/renderer/public/models/` (re-run manually anytime with `npm run setup-assets`) and
+compiles the cursor helper with `swiftc` (`npm run build-helper`). Without Xcode command line
+tools everything still works except pointer control, and the app says so.
 
 ### macOS permissions
 
@@ -77,6 +82,26 @@ Tunables in **Settings**:
 
 Per-mapping `holdMs` / `cooldownMs` overrides are supported in the config file.
 
+### Cursor control
+
+A mapping whose action is `mouse` behaves differently from a hotkey: instead of firing once,
+it **engages** after the hold and then steers the cursor continuously until you release.
+
+- The cursor follows the midpoint between your thumb and index fingertips — literally where
+  the pinch is — on the hand that *isn't* arming the guard.
+- **Reach** controls how much of the camera frame maps to the whole display. The default maps
+  the centre 60%, so you can reach screen corners without leaving the frame.
+- **Cursor smoothing** is an exponential filter over the pinch position; raise it if the
+  pointer jitters, lower it if it feels laggy.
+- Multi-monitor: pick which display the frame maps onto. Defaults to the primary display.
+- In **Test** mode the cursor is *not* moved — the overlay draws a `CURSOR` crosshair showing
+  where it would go, so you can practise safely.
+
+Cursor movement goes through a small Swift helper (`native/mouse-helper.swift`) kept alive as
+a single process while control is active — spawning one per update would cap the pointer far
+below camera frame rate. It posts `CGEvent` mouse-moved events, so macOS Accessibility
+permission applies here too.
+
 ## Configuration
 
 Everything is editable in the UI and persisted to `config.json` in the app's user-data dir
@@ -113,5 +138,6 @@ time comes in through frame samples — so debounce/cooldown behavior is fully u
 | Gesture engine | `src/shared` | safety guard, smoothing, hold, repeat, release re-arm |
 | Boop | renderer | Web Audio oscillator — no audio assets to ship |
 | Keystroke synthesis | main process | AppleScript / xdotool / SendKeys per platform |
+| Cursor control | main process | persistent Swift helper posting `CGEvent` moves (macOS) |
 | Config persistence | main process | atomic JSON writes in userData |
 | UI | renderer | React, live overlay canvas, tutorial guide |

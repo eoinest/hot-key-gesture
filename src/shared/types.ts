@@ -15,10 +15,19 @@ export interface Hotkey {
   modifiers: Modifier[]
 }
 
+/**
+ * 'hotkey' presses a key combination once. 'mouse' takes over the cursor and
+ * steers it from the acting hand's pinch point for as long as it is held.
+ */
+export type MappingActionKind = 'hotkey' | 'mouse'
+
 export interface GestureMapping {
   id: string
   gesture: GestureName
-  hotkey: Hotkey
+  /** Absent means 'hotkey' — older configs predate pointer control. */
+  action?: MappingActionKind
+  /** Required for 'hotkey' actions, unused for 'mouse'. */
+  hotkey?: Hotkey
   enabled: boolean
   label?: string
   /** Per-mapping overrides; fall back to global engine settings when unset. */
@@ -71,6 +80,36 @@ export const DEFAULT_SOUND_SETTINGS: SoundSettings = {
   volume: 0.3,
 }
 
+export interface MouseSettings {
+  /**
+   * Fraction of each frame edge left out of the mapping. The remaining centre
+   * spans the whole display, so you can reach the corners without moving your
+   * hand out of camera view.
+   */
+  margin: number
+  /** 0..1 exponential smoothing. Higher is steadier but lags more. */
+  smoothing: number
+  /** Electron display id to steer, or null for the primary display. */
+  displayId: number | null
+}
+
+export const DEFAULT_MOUSE_SETTINGS: MouseSettings = {
+  margin: 0.2,
+  smoothing: 0.55,
+  displayId: null,
+}
+
+/** Appended on load when a config has no pointer-control mapping yet. */
+export function defaultPinchMouseMapping(): GestureMapping {
+  return {
+    id: 'default-pinch-mouse',
+    gesture: 'Pinch',
+    action: 'mouse',
+    enabled: true,
+    label: 'Move the cursor',
+  }
+}
+
 /** Bumped when engine defaults change in a way that should reset user timings. */
 export const CONFIG_VERSION = 2
 
@@ -80,6 +119,7 @@ export interface AppConfig {
   camera: CameraSettings
   engine: EngineSettings
   sound: SoundSettings
+  mouse: MouseSettings
   mappings: GestureMapping[]
 }
 
@@ -111,6 +151,7 @@ export function defaultConfig(): AppConfig {
     camera: { mirror: true },
     engine: { ...DEFAULT_ENGINE_SETTINGS },
     sound: { ...DEFAULT_SOUND_SETTINGS },
+    mouse: { ...DEFAULT_MOUSE_SETTINGS },
     mappings: [
       {
         id: 'default-palm',
@@ -140,6 +181,7 @@ export function defaultConfig(): AppConfig {
         enabled: true,
         label: 'Switch app',
       },
+      defaultPinchMouseMapping(),
     ],
   }
 }

@@ -7,3 +7,6 @@ dist/
 # Downloaded/copied by scripts/setup-assets.mjs
 src/renderer/public/models/
 src/renderer/public/mediapipe/
+
+# Compiled by scripts/build-helper.mjs
+native/build/

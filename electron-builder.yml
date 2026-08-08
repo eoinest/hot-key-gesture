@@ -5,6 +5,9 @@ directories:
 files:
   - out/**
   - package.json
+extraResources:
+  - from: native/build/mouse-helper
+    to: mouse-helper
 mac:
   category: public.app-category.utilities
   extendInfo:
