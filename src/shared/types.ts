@@ -199,10 +199,12 @@ export const DEFAULT_ENGINE_SETTINGS: EngineSettings = {
   requireArmHand: true,
   armGesture: 'Closed_Fist',
   gapToleranceMs: 400,
-  // Measured: with a limit of 2, another person's hand in shot takes a slot and
-  // two-hand acquisition took ~24 s. At 4 it was immediate. The frame-rate cost
-  // is the lesser problem, and 2 is one setting away for anyone who disagrees.
-  maxHands: 4,
+  // Measured A/B on one camera session with both hands raised: a limit of 2
+  // holds a steady 30 fps, while 4 drops to a median of 15 — MediaPipe re-runs
+  // palm detection every frame while it has found fewer hands than its limit.
+  // Halving the frame rate makes the cursor visibly lag, and 2 acquired hands
+  // at least as fast, so 4 is opt-in for rooms with other people in shot.
+  maxHands: 2,
 }
 
 export function defaultConfig(): AppConfig {

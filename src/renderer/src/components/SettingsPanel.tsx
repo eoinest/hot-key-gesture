@@ -157,8 +157,8 @@ export function SettingsPanel({
         <div className="setting-text">
           <label>Hands to look for</label>
           <p>
-            Only the two nearest the camera are used. Searching for more costs frame rate — raise
-            it only if someone else’s hands keep taking a slot.
+            Only the two nearest the camera are used. Searching for more halves the frame rate
+            and makes the cursor lag — raise it only if someone else’s hands keep taking a slot.
           </p>
         </div>
         <select
@@ -166,8 +166,8 @@ export function SettingsPanel({
           value={engine.maxHands}
           onChange={(e) => set({ maxHands: Number(e.target.value) as 2 | 4 })}
         >
-          <option value={4}>4 — reliable</option>
-          <option value={2}>2 — faster</option>
+          <option value={2}>2 — smooth (30 fps)</option>
+          <option value={4}>4 — others in shot (15 fps)</option>
         </select>
       </div>
       <SliderRow
