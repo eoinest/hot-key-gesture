@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { detectPinch, pinchPoint } from '../src/renderer/src/lib/pinch'
+import { detectPinch, handSpan, pinchPoint, pinkyRaised } from '../src/renderer/src/lib/pinch'
 import type { Point3 } from '../src/renderer/src/lib/pinch'
 
 const WRIST = 0
@@ -75,6 +75,53 @@ describe('detectPinch', () => {
   it('ignores malformed landmark sets', () => {
     expect(detectPinch([]).pinch).toBe(false)
     expect(detectPinch([p(0, 0), p(1, 1)]).pinch).toBe(false)
+  })
+})
+
+describe('pinkyRaised', () => {
+  const RING_TIP = 16
+  const PINKY_TIP = 20
+
+  /**
+   * Pinky detection compares how far the pinky tip reaches versus the ring
+   * finger. Real hands measured ~0.75 curled and ~1.10 raised.
+   */
+  function withPinky(vsRing: number): Point3[] {
+    const pts = hand({ tipGap: 0.02, freeFingersOut: false })
+    pts[RING_TIP] = p(0.5, 0.7) // 0.2 from the wrist at (0.5, 0.9)
+    pts[PINKY_TIP] = p(0.5, 0.9 - 0.2 * vsRing)
+    return pts
+  }
+
+  it('detects a raised pinky at the measured raised value', () => {
+    expect(pinkyRaised(withPinky(1.1))).toBe(true)
+  })
+
+  it('ignores a curled pinky at the measured curled value', () => {
+    expect(pinkyRaised(withPinky(0.75))).toBe(false)
+  })
+
+  it('holds through the gap once raised (hysteresis)', () => {
+    // A value inside the dead band neither starts nor ends a raise.
+    expect(pinkyRaised(withPinky(0.96), false)).toBe(false)
+    expect(pinkyRaised(withPinky(0.96), true)).toBe(true)
+  })
+
+  it('ignores malformed landmarks', () => {
+    expect(pinkyRaised([])).toBe(false)
+  })
+})
+
+describe('handSpan', () => {
+  it('measures a nearer hand as larger, which is how the user beats a bystander', () => {
+    const near = hand({ tipGap: 0.1, freeFingersOut: true })
+    // Same pose, half the apparent size — someone further from the camera.
+    const far = near.map((q) => p(0.5 + (q.x - 0.5) / 2, 0.5 + (q.y - 0.5) / 2))
+    expect(handSpan(near)).toBeGreaterThan(handSpan(far))
+  })
+
+  it('returns zero for malformed landmarks', () => {
+    expect(handSpan([])).toBe(0)
   })
 })
 

@@ -385,6 +385,7 @@ describe('click while steering', () => {
     smoothing: 0.5,
     displayId: null,
     clickEnabled: true,
+    clickMode: 'gesture',
     clickGesture: 'Closed_Fist',
   }
 
@@ -448,6 +449,59 @@ describe('click while steering', () => {
   it('does not click when clicking is disabled', () => {
     const engine = pointerEngine({ clickEnabled: false })
     expect(feed(engine, steer('Closed_Fist'), 20, 1000).filter((r) => r.click)).toHaveLength(0)
+  })
+
+  describe('pinky click mode', () => {
+    /** Steering hand stays pinched throughout; only the pinky changes. */
+    const pinky = (up: boolean): HandSample[] => [
+      { gesture: 'Closed_Fist', confidence: 0.9, handedness: 'Left' },
+      { gesture: 'Pinch', confidence: 0.9, handedness: 'Right', pinkyUp: up },
+    ]
+
+    function engine() {
+      const options: EngineOptions = {
+        settings: { ...SETTINGS, requireArmHand: true, gapToleranceMs: 400 },
+        mappings: [POINTER_MAPPING],
+        mouse: { ...MOUSE, clickMode: 'pinky' },
+      }
+      const e = new GestureEngine(() => options)
+      expect(feed(e, pinky(false), 30, 0).at(-1)!.tracking).not.toBeNull()
+      return e
+    }
+
+    it('clicks once when the pinky goes up', () => {
+      expect(feed(engine(), pinky(true), 20, 1000).filter((r) => r.click)).toHaveLength(1)
+    })
+
+    it('keeps steering — the pinch never breaks', () => {
+      const results = feed(engine(), pinky(true), 20, 1000)
+      expect(results.every((r) => r.tracking !== null)).toBe(true)
+      expect(results.at(-1)!.stable).toBe('Pinch')
+    })
+
+    it('does not repeat while the pinky stays up', () => {
+      expect(feed(engine(), pinky(true), 120, 1000).filter((r) => r.click)).toHaveLength(1)
+    })
+
+    it('clicks again after lowering and raising', () => {
+      const e = engine()
+      expect(feed(e, pinky(true), 20, 1000).filter((r) => r.click)).toHaveLength(1)
+      feed(e, pinky(false), 20, 2000)
+      expect(feed(e, pinky(true), 20, 3000).filter((r) => r.click)).toHaveLength(1)
+    })
+
+    it('ignores a one-frame flicker', () => {
+      expect(feed(engine(), pinky(true), 1, 1000).filter((r) => r.click)).toHaveLength(0)
+    })
+
+    it('ignores the click gesture in pinky mode', () => {
+      const e = engine()
+      const fistInstead: HandSample[] = [
+        { gesture: 'Closed_Fist', confidence: 0.9, handedness: 'Left' },
+        { gesture: 'Closed_Fist', confidence: 0.9, handedness: 'Right', pinkyUp: false },
+      ]
+      expect(feed(e, fistInstead, 20, 1000).filter((r) => r.click)).toHaveLength(0)
+    })
   })
 
   it('never clicks outside a pointer session', () => {

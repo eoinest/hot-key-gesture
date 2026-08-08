@@ -13,8 +13,10 @@ export async function createGestureRecognizer(): Promise<GestureRecognizer> {
       delegate,
     },
     runningMode: 'VIDEO' as const,
-    // Two hands: one can arm the safety guard while the other acts.
-    numHands: 2,
+    // The guard needs two hands, but a limit of two means a bystander's hand
+    // in frame can take a slot and lock the user out of their own app. Detect
+    // more than we need and let the caller keep the two nearest the camera.
+    numHands: 4,
   })
   try {
     return await GestureRecognizer.createFromOptions(fileset, options('GPU'))

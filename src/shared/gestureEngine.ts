@@ -11,6 +11,8 @@ export interface HandSample {
    * frames, so this is what pins a hand to a role during a pointer session.
    */
   handedness?: string
+  /** Pinky deliberately raised — the click signal in 'pinky' click mode. */
+  pinkyUp?: boolean
 }
 
 export interface FrameSample {
@@ -156,9 +158,10 @@ export class GestureEngine {
         const raw = gated[actionHandIndex]
         const clickHeld =
           !!mouse?.clickEnabled &&
-          raw === mouse.clickGesture &&
           this.sessionGesture !== null &&
-          mouse.clickGesture !== this.sessionGesture
+          (mouse.clickMode === 'pinky'
+            ? sample.hands[actionHandIndex]?.pinkyUp === true
+            : raw === mouse.clickGesture && mouse.clickGesture !== this.sessionGesture)
         return {
           // A click must not end the session, so report the session's own
           // gesture while the steering hand is clicking.
