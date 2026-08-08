@@ -1,0 +1,9 @@
+node_modules/
+out/
+dist/
+*.log
+.DS_Store
+
+# Downloaded/copied by scripts/setup-assets.mjs
+src/renderer/public/models/
+src/renderer/public/mediapipe/
