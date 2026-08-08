@@ -29,6 +29,29 @@ function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v
 }
 
+const CAMERA_START_TIMEOUT_MS = 6000
+const NO_FRAMES = 'camera-produced-no-frames'
+
+/** Resolve once the video is actually decoding frames, or reject on timeout. */
+function waitForFrames(video: HTMLVideoElement, timeoutMs: number): Promise<void> {
+  if (video.videoWidth > 0 && video.readyState >= 2) return Promise.resolve()
+  return new Promise((resolve, reject) => {
+    const done = (err?: Error) => {
+      clearTimeout(timer)
+      clearInterval(poll)
+      video.removeEventListener('loadeddata', onData)
+      err ? reject(err) : resolve()
+    }
+    const onData = () => {
+      if (video.videoWidth > 0) done()
+    }
+    const timer = setTimeout(() => done(new Error(NO_FRAMES)), timeoutMs)
+    // A dead track fires no events at all, so poll as well as listen.
+    const poll = setInterval(onData, 250)
+    video.addEventListener('loadeddata', onData)
+  })
+}
+
 export interface LogFn {
   (kind: 'live' | 'test' | 'error' | 'info', message: string): void
 }
@@ -159,6 +182,18 @@ export function useGesturePipeline({
         streamRef.current = stream
         video.srcObject = stream
         await video.play()
+
+        // getUserMedia can hand back a stream that never produces a frame —
+        // most often when another process still holds the camera. Without this
+        // the preview just sits black and nothing in the app explains why.
+        await waitForFrames(video, CAMERA_START_TIMEOUT_MS)
+        if (cancelled) return
+
+        // If the camera is taken away later, say so rather than going quiet.
+        const [track] = stream.getVideoTracks()
+        track?.addEventListener('ended', () => {
+          if (!cancelled) setCameraError('The camera was disconnected or taken by another app.')
+        })
       } catch (err: unknown) {
         if (cancelled) return
         const name = err instanceof DOMException ? err.name : ''
@@ -167,7 +202,9 @@ export function useGesturePipeline({
             ? 'Camera access was denied. Grant camera permission and retry.'
             : name === 'NotFoundError' || name === 'OverconstrainedError'
               ? 'No camera found (or the selected camera is unavailable).'
-              : `Could not start the camera: ${err instanceof Error ? err.message : String(err)}`,
+              : err instanceof Error && err.message === NO_FRAMES
+                ? 'The camera opened but sent no video. Another app may still be using it — close it and retry.'
+                : `Could not start the camera: ${err instanceof Error ? err.message : String(err)}`,
         )
       }
     }
