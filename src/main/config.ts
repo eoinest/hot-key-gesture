@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { defaultConfig } from '../shared/types'
+import { CONFIG_VERSION, defaultConfig } from '../shared/types'
 import type { AppConfig } from '../shared/types'
 
 export function configPath(): string {
@@ -16,12 +16,18 @@ export function loadConfig(): AppConfig {
   const defaults = defaultConfig()
   try {
     const raw = JSON.parse(readFileSync(configPath(), 'utf-8')) as Partial<AppConfig>
+    // An older config predates the two-hand safety guard, and its timings were
+    // tuned for one-handed triggering. Adopt the new engine defaults wholesale
+    // rather than leaving a 250 ms hold behind a guard meant to be deliberate.
+    const engine = raw.version === CONFIG_VERSION ? { ...defaults.engine, ...raw.engine } : defaults.engine
     return {
       ...defaults,
       ...raw,
+      version: CONFIG_VERSION,
       camera: { ...defaults.camera, ...raw.camera },
-      engine: { ...defaults.engine, ...raw.engine },
-      mappings: Array.isArray(raw.mappings) ? raw.mappings : defaults.mappings,
+      sound: { ...defaults.sound, ...raw.sound },
+      engine,
+      mappings: Array.isArray(raw.mappings) && raw.mappings.length ? raw.mappings : defaults.mappings,
     }
   } catch {
     return defaults

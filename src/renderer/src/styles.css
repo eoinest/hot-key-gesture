@@ -258,6 +258,47 @@ body {
   }
 }
 
+/* ---------- Arm banner (safety guard) ---------- */
+
+.arm-banner {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: rgba(13, 16, 23, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-strong);
+  color: var(--text-dim);
+  font-size: 13px;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.arm-banner.armed {
+  border-color: var(--green);
+  color: var(--green);
+  background: rgba(20, 45, 30, 0.85);
+}
+
+.arm-emoji {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.arm-banner b {
+  color: var(--text);
+}
+
+.arm-banner.armed b {
+  color: var(--green);
+}
+
 /* ---------- HUD ---------- */
 
 .hud {
@@ -622,6 +663,69 @@ kbd {
 }
 
 /* ---------- Guide ---------- */
+
+.guide-steps {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  padding: 12px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guide-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.guide-step b {
+  color: var(--text);
+}
+
+.step-num {
+  flex-shrink: 0;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.step-emoji {
+  font-size: 17px;
+  line-height: 1.1;
+  flex-shrink: 0;
+}
+
+.arm-tag {
+  margin-left: 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--amber);
+  background: var(--amber-soft);
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: middle;
+}
+
+.guide-card.is-arm {
+  border-color: rgba(251, 191, 36, 0.45);
+}
+
+.setting-disabled {
+  opacity: 0.5;
+}
 
 .guide-grid {
   display: grid;

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { GestureRecognizer } from '@mediapipe/tasks-vision'
 import { GestureEngine } from '../../../shared/gestureEngine'
-import type { EngineState } from '../../../shared/gestureEngine'
+import type { EngineState, HandSample } from '../../../shared/gestureEngine'
 import { isValidHotkey } from '../../../shared/hotkeys'
 import { DEFAULT_ENGINE_SETTINGS } from '../../../shared/types'
 import type { AppConfig, AppMode, GestureMapping, GestureName } from '../../../shared/types'
@@ -15,6 +15,10 @@ export interface Hud {
   holdProgress: number
   confidence: number
   fps: number
+  /** Safety guard satisfied (or disabled). */
+  armed: boolean
+  /** How many hands the recognizer currently sees. */
+  handCount: number
 }
 
 export type RecognizerStatus = 'loading' | 'ready' | 'error'
@@ -42,6 +46,8 @@ export function useGesturePipeline({ config, configRef, onFired, onLog }: Pipeli
     holdProgress: 0,
     confidence: 0,
     fps: 0,
+    armed: false,
+    handCount: 0,
   })
   const [flashToken, setFlashToken] = useState(0)
   const [cameraError, setCameraError] = useState<string | null>(null)
@@ -172,23 +178,22 @@ export function useGesturePipeline({ config, configRef, onFired, onLog }: Pipeli
         return
       }
 
-      const landmarks = result.landmarks?.[0] ?? null
-      const top = result.gestures?.[0]?.[0]
-      let gesture: GestureName | null = null
-      let confidence = 0
-      if (top && top.categoryName && top.categoryName !== 'None') {
-        gesture = top.categoryName as GestureName
-        confidence = top.score
-      } else if (landmarks) {
-        const pinch = detectPinch(landmarks)
-        if (pinch.pinch) {
-          gesture = 'Pinch'
-          confidence = pinch.confidence
+      // Classify every detected hand; fall back to landmark-derived pinch
+      // when the built-in classifier reports nothing for that hand.
+      const allLandmarks = result.landmarks ?? []
+      const hands: HandSample[] = allLandmarks.map((landmarks, i) => {
+        const top = result.gestures?.[i]?.[0]
+        if (top && top.categoryName && top.categoryName !== 'None') {
+          return { gesture: top.categoryName as GestureName, confidence: top.score }
         }
-      }
+        const pinch = detectPinch(landmarks)
+        return pinch.pinch
+          ? { gesture: 'Pinch' as GestureName, confidence: pinch.confidence }
+          : { gesture: null, confidence: 0 }
+      })
 
-      const frame = engine.frame({ gesture, confidence, t })
-      drawOverlay(canvas, video, landmarks, cfg.camera.mirror, frame, cfg.mode !== 'paused')
+      const frame = engine.frame({ hands, t })
+      drawOverlay(canvas, video, allLandmarks, cfg.camera.mirror, frame, cfg.mode !== 'paused')
 
       if (frame.fired && cfg.mode !== 'paused') {
         setFlashToken((n) => n + 1)
@@ -201,8 +206,10 @@ export function useGesturePipeline({ config, configRef, onFired, onLog }: Pipeli
           stable: frame.stable,
           state: frame.state,
           holdProgress: frame.holdProgress,
-          confidence,
+          confidence: hands[frame.actionHandIndex]?.confidence ?? 0,
           fps: Math.round(fpsEma),
+          armed: frame.armed,
+          handCount: hands.length,
         })
       }
     }

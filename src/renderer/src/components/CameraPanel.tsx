@@ -13,6 +13,9 @@ interface CameraPanelProps {
   flashToken: number
   cameraError: string | null
   recognizerStatus: RecognizerStatus
+  requireArmHand: boolean
+  armGestureLabel: string
+  armGestureEmoji: string
   onRetryCamera: () => void
 }
 
@@ -31,6 +34,9 @@ export function CameraPanel({
   flashToken,
   cameraError,
   recognizerStatus,
+  requireArmHand,
+  armGestureLabel,
+  armGestureEmoji,
   onRetryCamera,
 }: CameraPanelProps) {
   const [flashOn, setFlashOn] = useState(false)
@@ -75,6 +81,21 @@ export function CameraPanel({
         </div>
       )}
 
+      {requireArmHand && (
+        <div className={`arm-banner ${hud.armed ? 'armed' : ''}`}>
+          <span className="arm-emoji">{armGestureEmoji}</span>
+          {hud.armed ? (
+            <span>
+              Armed — now make a gesture with your other hand
+            </span>
+          ) : (
+            <span>
+              Safety guard on: hold <b>{armGestureLabel}</b> with one hand to arm
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="hud">
         <div className={`gesture-chip state-${showHoldState ? hud.state : 'idle'}`}>
           <span className="chip-emoji">{gestureEmoji(hud.stable)}</span>
@@ -86,11 +107,16 @@ export function CameraPanel({
           </div>
           {showHoldState && (
             <span className="chip-state">
-              {hud.state === 'cooldown' ? '✓' : `${Math.round(hud.holdProgress * 100)}%`}
+              {hud.state === 'cooldown' && hud.holdProgress === 0
+                ? '✓'
+                : `${Math.round(hud.holdProgress * 100)}%`}
             </span>
           )}
         </div>
         <div className="hud-badges">
+          <span className="badge">
+            {hud.handCount} {hud.handCount === 1 ? 'hand' : 'hands'}
+          </span>
           <span className="badge">{hud.fps} fps</span>
           <span className={`badge mode-badge mode-${mode}`}>{MODE_LABELS[mode]}</span>
         </div>

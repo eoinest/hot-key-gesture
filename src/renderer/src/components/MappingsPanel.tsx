@@ -6,6 +6,9 @@ interface MappingsPanelProps {
   mappings: GestureMapping[]
   stable: GestureName | null
   platform: string
+  requireArmHand: boolean
+  armGestureLabel: string
+  armGestureEmoji: string
   onChange: (mappings: GestureMapping[]) => void
 }
 
@@ -14,7 +17,15 @@ function newId(): string {
   return `mapping-${Date.now().toString(36)}-${nextId++}`
 }
 
-export function MappingsPanel({ mappings, stable, platform, onChange }: MappingsPanelProps) {
+export function MappingsPanel({
+  mappings,
+  stable,
+  platform,
+  requireArmHand,
+  armGestureLabel,
+  armGestureEmoji,
+  onChange,
+}: MappingsPanelProps) {
   const update = (id: string, patch: Partial<GestureMapping>) => {
     onChange(mappings.map((m) => (m.id === id ? { ...m, ...patch } : m)))
   }
@@ -41,8 +52,17 @@ export function MappingsPanel({ mappings, stable, platform, onChange }: Mappings
   return (
     <div className="mappings">
       <p className="panel-hint">
-        Hold a gesture toward the camera to fire its shortcut. Rows light up while their gesture
-        is recognized — try it now.
+        {requireArmHand ? (
+          <>
+            Hold <b>{armGestureEmoji} {armGestureLabel}</b> with one hand to arm, then make one of
+            these gestures with your other hand. Rows light up while their gesture is recognized.
+          </>
+        ) : (
+          <>
+            Hold a gesture toward the camera to fire its shortcut. Rows light up while their
+            gesture is recognized — try it now.
+          </>
+        )}
       </p>
       {mappings.map((m) => {
         const info = GESTURE_INFO[m.gesture]
@@ -76,6 +96,14 @@ export function MappingsPanel({ mappings, stable, platform, onChange }: Mappings
             {shadowed && (
               <span className="warn-dot" title="Another enabled row already maps this gesture — the first one wins.">
                 ⚠️
+              </span>
+            )}
+            {requireArmHand && info?.label === armGestureLabel && (
+              <span
+                className="warn-dot"
+                title={`This is also your arm gesture — you'd need ${armGestureLabel} with both hands to fire it.`}
+              >
+                ✊
               </span>
             )}
             <label className="switch" title={m.enabled ? 'Enabled' : 'Disabled'}>

@@ -1,12 +1,21 @@
+import { GESTURES } from '../../../shared/gestures'
 import { DEFAULT_ENGINE_SETTINGS } from '../../../shared/types'
-import type { CameraSettings, EngineSettings } from '../../../shared/types'
+import type {
+  CameraSettings,
+  EngineSettings,
+  GestureName,
+  SoundSettings,
+} from '../../../shared/types'
+import { playBoop } from '../lib/sound'
 
 interface SettingsPanelProps {
   engine: EngineSettings
   camera: CameraSettings
+  sound: SoundSettings
   devices: MediaDeviceInfo[]
   onEngineChange: (engine: EngineSettings) => void
   onCameraChange: (camera: CameraSettings) => void
+  onSoundChange: (sound: SoundSettings) => void
 }
 
 interface SliderRowProps {
@@ -67,38 +76,68 @@ function ToggleRow({ label, hint, checked, onChange }: ToggleRowProps) {
 export function SettingsPanel({
   engine,
   camera,
+  sound,
   devices,
   onEngineChange,
   onCameraChange,
+  onSoundChange,
 }: SettingsPanelProps) {
   const set = (patch: Partial<EngineSettings>) => onEngineChange({ ...engine, ...patch })
 
+  const fmtSeconds = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${v} ms`)
+
   return (
     <div className="settings">
+      <h3 className="settings-heading">Safety guard</h3>
+      <ToggleRow
+        label="Require a second hand"
+        hint="Nothing fires unless one hand holds the arm gesture while the other acts. Strongly recommended."
+        checked={engine.requireArmHand}
+        onChange={(requireArmHand) => set({ requireArmHand })}
+      />
+      <div className={`setting-row ${engine.requireArmHand ? '' : 'setting-disabled'}`}>
+        <div className="setting-text">
+          <label>Arm gesture</label>
+          <p>The gesture the arming hand must hold. Either hand can arm.</p>
+        </div>
+        <select
+          className="device-select"
+          disabled={!engine.requireArmHand}
+          value={engine.armGesture}
+          onChange={(e) => set({ armGesture: e.target.value as GestureName })}
+        >
+          {GESTURES.map((g) => (
+            <option key={g.name} value={g.name}>
+              {g.emoji} {g.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <h3 className="settings-heading">Triggering</h3>
       <SliderRow
         label="Hold time"
-        hint="How long a gesture must be held before it fires."
+        hint="How long the gesture must be held before it fires."
         value={engine.holdMs}
-        min={50}
-        max={1500}
-        step={50}
-        format={(v) => `${v} ms`}
+        min={250}
+        max={6000}
+        step={250}
+        format={fmtSeconds}
         onChange={(holdMs) => set({ holdMs })}
       />
       <SliderRow
-        label="Cooldown"
-        hint="Minimum time between two triggers of the same gesture."
+        label="Repeat interval"
+        hint="With auto-repeat on, how long until it fires again while still held. Otherwise the minimum gap between triggers."
         value={engine.cooldownMs}
-        min={100}
-        max={3000}
-        step={50}
-        format={(v) => `${v} ms`}
+        min={250}
+        max={6000}
+        step={250}
+        format={fmtSeconds}
         onChange={(cooldownMs) => set({ cooldownMs })}
       />
       <ToggleRow
         label="Release to re-trigger"
-        hint="Require dropping the gesture before it can fire again. Off = repeats every cooldown while held."
+        hint="On: drop the gesture before it can fire again. Off: keeps firing every repeat interval while held."
         checked={engine.requireRelease}
         onChange={(requireRelease) => set({ requireRelease })}
       />
@@ -124,6 +163,43 @@ export function SettingsPanel({
         format={(v) => `${v} frames`}
         onChange={(smoothingFrames) => set({ smoothingFrames })}
       />
+
+      <h3 className="settings-heading">Feedback</h3>
+      <ToggleRow
+        label="Boop on trigger"
+        hint="Play a short sound whenever a gesture fires its shortcut, so you know it worked without looking."
+        checked={sound.enabled}
+        onChange={(enabled) => {
+          onSoundChange({ ...sound, enabled })
+          if (enabled) playBoop(sound.volume)
+        }}
+      />
+      <div className={`setting-row ${sound.enabled ? '' : 'setting-disabled'}`}>
+        <div className="setting-text">
+          <label>Volume</label>
+          <p>Click the speaker to preview.</p>
+        </div>
+        <div className="setting-control">
+          <input
+            type="range"
+            min={0.05}
+            max={1}
+            step={0.05}
+            disabled={!sound.enabled}
+            value={sound.volume}
+            onChange={(e) => onSoundChange({ ...sound, volume: Number(e.target.value) })}
+            onMouseUp={() => sound.enabled && playBoop(sound.volume)}
+          />
+          <button
+            className="btn small"
+            disabled={!sound.enabled}
+            onClick={() => playBoop(sound.volume)}
+            title="Preview the boop"
+          >
+            🔊
+          </button>
+        </div>
+      </div>
 
       <h3 className="settings-heading">Camera</h3>
       <div className="setting-row">
@@ -158,7 +234,7 @@ export function SettingsPanel({
         onClick={() => onEngineChange({ ...DEFAULT_ENGINE_SETTINGS })}
         style={{ marginTop: 16 }}
       >
-        Reset triggering &amp; recognition to defaults
+        Reset safety, triggering &amp; recognition to defaults
       </button>
     </div>
   )
