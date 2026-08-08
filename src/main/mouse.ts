@@ -83,6 +83,34 @@ export function listDisplays(): DisplayInfo[] {
   }))
 }
 
+interface Bounds {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/**
+ * The rectangle the camera frame maps onto. 'all' returns the union of every
+ * display, which is what lets the cursor cross onto a second screen — mapping
+ * to one display's bounds confines it there no matter how far you reach.
+ */
+function targetBounds(settings: MouseSettings): Bounds {
+  const displays = screen.getAllDisplays()
+  if (settings.displayId === 'all' && displays.length > 0) {
+    const left = Math.min(...displays.map((d) => d.bounds.x))
+    const top = Math.min(...displays.map((d) => d.bounds.y))
+    const right = Math.max(...displays.map((d) => d.bounds.x + d.bounds.width))
+    const bottom = Math.max(...displays.map((d) => d.bounds.y + d.bounds.height))
+    return { x: left, y: top, width: right - left, height: bottom - top }
+  }
+  const chosen =
+    typeof settings.displayId === 'number'
+      ? displays.find((d) => d.id === settings.displayId)
+      : null
+  return (chosen ?? screen.getPrimaryDisplay()).bounds
+}
+
 /**
  * Move the cursor to a normalized position (0..1) within the configured
  * display. Returns an error string if the helper is unavailable.
@@ -95,12 +123,7 @@ export function moveCursorNormalized(
   const proc = ensureHelper()
   if (!proc) return spawnFailed ?? 'Cursor helper unavailable'
 
-  const target =
-    (settings.displayId != null
-      ? screen.getAllDisplays().find((d) => d.id === settings.displayId)
-      : null) ?? screen.getPrimaryDisplay()
-
-  const { x, y, width, height } = target.bounds
+  const { x, y, width, height } = targetBounds(settings)
   const px = Math.round(x + clamp01(nx) * (width - 1))
   const py = Math.round(y + clamp01(ny) * (height - 1))
 

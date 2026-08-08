@@ -96,8 +96,12 @@ export interface MouseSettings {
   margin: number
   /** 0..1 exponential smoothing. Higher is steadier but lags more. */
   smoothing: number
-  /** Electron display id to steer, or null for the primary display. */
-  displayId: number | null
+  /**
+   * Which screen the camera frame maps onto: 'all' spans every display as one
+   * surface (the only way to reach a second screen), a number targets one
+   * display by id, null means the primary display.
+   */
+  displayId: number | 'all' | null
   /** Click when the steering hand switches to `clickGesture` mid-session. */
   clickEnabled: boolean
   /**
@@ -111,7 +115,9 @@ export interface MouseSettings {
 export const DEFAULT_MOUSE_SETTINGS: MouseSettings = {
   margin: 0.2,
   smoothing: 0.55,
-  displayId: null,
+  // Spanning is the same as the primary display on a single-screen setup, and
+  // the only thing that works on more than one, so it is the better default.
+  displayId: 'all',
   clickEnabled: true,
   clickGesture: 'Closed_Fist',
 }

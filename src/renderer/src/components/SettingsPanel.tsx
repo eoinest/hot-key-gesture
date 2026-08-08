@@ -231,17 +231,25 @@ export function SettingsPanel({
       <div className={`setting-row ${pointerAvailable ? '' : 'setting-disabled'}`}>
         <div className="setting-text">
           <label>Display</label>
-          <p>Which screen the camera frame maps onto.</p>
+          <p>
+            Which screen the camera frame maps onto. Span all to reach a second screen —
+            targeting one display keeps the cursor inside it.
+          </p>
         </div>
         <select
           className="device-select"
           disabled={!pointerAvailable}
-          value={mouse.displayId ?? ''}
-          onChange={(e) =>
-            onMouseChange({ ...mouse, displayId: e.target.value ? Number(e.target.value) : null })
-          }
+          value={mouse.displayId === 'all' ? 'all' : (mouse.displayId ?? '')}
+          onChange={(e) => {
+            const v = e.target.value
+            onMouseChange({
+              ...mouse,
+              displayId: v === 'all' ? 'all' : v ? Number(v) : null,
+            })
+          }}
         >
-          <option value="">Primary display</option>
+          <option value="all">All displays (span)</option>
+          <option value="">Primary display only</option>
           {displays.map((d) => (
             <option key={d.id} value={d.id}>
               {d.label}
