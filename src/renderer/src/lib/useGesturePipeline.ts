@@ -6,7 +6,7 @@ import { isValidHotkey } from '../../../shared/hotkeys'
 import { DEFAULT_ENGINE_SETTINGS } from '../../../shared/types'
 import type { AppConfig, AppMode, GestureMapping, GestureName } from '../../../shared/types'
 import { createGestureRecognizer } from './recognizer'
-import { detectPinch, pinchPoint } from './pinch'
+import { detectPinch, handSpan, pinchPoint } from './pinch'
 import { drawOverlay } from './drawing'
 
 export interface Hud {
@@ -203,16 +203,25 @@ export function useGesturePipeline({
 
       // Classify every detected hand; fall back to landmark-derived pinch
       // when the built-in classifier reports nothing for that hand.
-      const allLandmarks = result.landmarks ?? []
-      const hands: HandSample[] = allLandmarks.map((landmarks, i) => {
-        const top = result.gestures?.[i]?.[0]
+      // Keep only the two hands nearest the camera. The recognizer is asked for
+      // more than we need so that a passer-by's hand can't occupy a slot and
+      // stop the user's own second hand from being tracked.
+      const detected = (result.landmarks ?? []).map((landmarks, i) => ({ landmarks, i }))
+      const kept =
+        detected.length <= 2
+          ? detected
+          : [...detected].sort((a, b) => handSpan(b.landmarks) - handSpan(a.landmarks)).slice(0, 2)
+
+      const allLandmarks = kept.map((h) => h.landmarks)
+      const hands: HandSample[] = kept.map(({ landmarks, i: sourceIndex }, i) => {
+        const top = result.gestures?.[sourceIndex]?.[0]
         const named = top?.categoryName && top.categoryName !== 'None' ? top : null
 
         // Pinch wins over the classifier. MediaPipe has no pinch class and
         // confidently reports pinched fingers as a fist, so deferring to it
         // would hide a pinch that the landmarks state outright. detectPinch
         // requires the free fingers to be extended, so a real fist won't match.
-        const handedness = result.handedness?.[i]?.[0]?.categoryName
+        const handedness = result.handedness?.[sourceIndex]?.[0]?.categoryName
 
         // Only look for a pinch when the classifier has nothing confident to
         // say. A fist and a pinch are nearly indistinguishable geometrically

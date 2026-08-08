@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { detectPinch, pinchPoint } from '../src/renderer/src/lib/pinch'
+import { detectPinch, handSpan, pinchPoint } from '../src/renderer/src/lib/pinch'
 import type { Point3 } from '../src/renderer/src/lib/pinch'
 
 const WRIST = 0
@@ -75,6 +75,19 @@ describe('detectPinch', () => {
   it('ignores malformed landmark sets', () => {
     expect(detectPinch([]).pinch).toBe(false)
     expect(detectPinch([p(0, 0), p(1, 1)]).pinch).toBe(false)
+  })
+})
+
+describe('handSpan', () => {
+  it('measures a nearer hand as larger, which is how the user beats a bystander', () => {
+    const near = hand({ tipGap: 0.1, freeFingersOut: true })
+    // Same pose, half the apparent size — someone further from the camera.
+    const far = near.map((q) => p(0.5 + (q.x - 0.5) / 2, 0.5 + (q.y - 0.5) / 2))
+    expect(handSpan(near)).toBeGreaterThan(handSpan(far))
+  })
+
+  it('returns zero for malformed landmarks', () => {
+    expect(handSpan([])).toBe(0)
   })
 })
 

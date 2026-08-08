@@ -22,6 +22,18 @@ function dist(a: Point3, b: Point3): number {
 }
 
 /**
+ * Apparent size of a hand, as the span of its landmarks. A hand close to the
+ * camera measures larger, which is how the user's own hands are told apart
+ * from someone standing behind them.
+ */
+export function handSpan(landmarks: Point3[]): number {
+  if (!landmarks || landmarks.length < 21) return 0
+  const xs = landmarks.map((p) => p.x)
+  const ys = landmarks.map((p) => p.y)
+  return Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys))
+}
+
+/**
  * The point the cursor should follow: midway between thumb and index tips,
  * i.e. where the pinch visually "is". Returns normalized image coordinates.
  */
