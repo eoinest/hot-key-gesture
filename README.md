@@ -19,6 +19,9 @@ hand tracking). No frames or data ever leave your machine.
   configurable reach, smoothing, and target display. Release to hand the mouse back.
 - **Click without touching anything** — mid-drag, **raise your pinky** while staying pinched to
   left-click. Lower it to arm the next click.
+- **Three kinds of action** — a gesture can press a ⌨️ shortcut, take over the 🖱️ cursor, or
+  play a 🔊 bundled sound. There is a secret one already mapped; the web-shooter sign 🤟 is a
+  reasonable place to start looking.
 - **Fully configurable** — map any gesture to any shortcut with a click-to-record hotkey
   field, enable/disable rows, add/remove mappings. Tuning knobs for the arm gesture, hold
   time, repeat interval, confidence threshold, and smoothing. The guard can be switched off

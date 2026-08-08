@@ -89,7 +89,7 @@ export function useGesturePipeline({
       settings: configRef.current?.engine ?? DEFAULT_ENGINE_SETTINGS,
       mouse: configRef.current?.mouse,
       mappings: (configRef.current?.mappings ?? []).filter(
-        (m) => m.action === 'mouse' || isValidHotkey(m.hotkey),
+        (m) => m.action === 'mouse' || m.action === 'sound' || isValidHotkey(m.hotkey),
       ),
     }))
   }

@@ -560,6 +560,22 @@ body {
   text-overflow: ellipsis;
 }
 
+.sound-action {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid rgba(139, 157, 255, 0.45);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .setting-warning {
   margin: 0 2px 10px;
   padding: 8px 10px;

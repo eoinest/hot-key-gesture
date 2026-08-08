@@ -49,3 +49,22 @@ export function playBoop(volume = 0.3): void {
 export function playErrorTone(volume = 0.3): void {
   blip(volume * 0.9, 320, 180, 220, 'triangle')
 }
+
+const clips = new Map<string, HTMLAudioElement>()
+
+/**
+ * Play a bundled audio file. Elements are cached and rewound rather than
+ * recreated, so repeat triggers restart the clip instead of stacking copies
+ * on top of each other.
+ */
+export function playClip(file: string, volume = 1): Promise<void> {
+  let audio = clips.get(file)
+  if (!audio) {
+    audio = new Audio(file)
+    audio.preload = 'auto'
+    clips.set(file, audio)
+  }
+  audio.volume = Math.min(1, Math.max(0, volume))
+  audio.currentTime = 0
+  return audio.play()
+}

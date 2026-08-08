@@ -9,7 +9,7 @@ import { CameraPanel } from './components/CameraPanel'
 import { GuidePanel } from './components/GuidePanel'
 import { MappingsPanel } from './components/MappingsPanel'
 import { SettingsPanel } from './components/SettingsPanel'
-import { playBoop, playErrorTone } from './lib/sound'
+import { playBoop, playClip, playErrorTone } from './lib/sound'
 import { useGesturePipeline } from './lib/useGesturePipeline'
 
 type Tab = 'gestures' | 'guide' | 'settings' | 'activity'
@@ -109,6 +109,22 @@ export default function App() {
     (mapping: GestureMapping, mode: AppMode) => {
       const info = GESTURE_INFO[mapping.gesture]
       const { enabled, volume } = soundRef.current
+
+      if (mapping.action === 'sound') {
+        const file = mapping.soundFile
+        if (!file) {
+          addLog('error', `${info?.label ?? mapping.gesture} has no sound file set.`)
+          return
+        }
+        // A clip has no effect outside the app, so it plays in test mode too —
+        // muting it would make the mapping impossible to try.
+        void playClip(file).then(
+          () => addLog(mode === 'test' ? 'test' : 'live', `${info?.emoji ?? ''} ${mapping.label ?? 'Sound'}`),
+          (err: unknown) =>
+            addLog('error', `Could not play ${file}: ${err instanceof Error ? err.message : String(err)}`),
+        )
+        return
+      }
 
       if (mapping.action === 'mouse') {
         if (enabled) playBoop(volume)

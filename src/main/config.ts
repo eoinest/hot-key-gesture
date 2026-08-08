@@ -1,7 +1,12 @@
 import { app } from 'electron'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { CONFIG_VERSION, defaultConfig, defaultPinchMouseMapping } from '../shared/types'
+import {
+  CONFIG_VERSION,
+  defaultConfig,
+  defaultPinchMouseMapping,
+  secretSoundMapping,
+} from '../shared/types'
 import type { AppConfig, GestureMapping } from '../shared/types'
 
 export function configPath(): string {
@@ -33,7 +38,7 @@ export function loadConfig(): AppConfig {
       sound: { ...defaults.sound, ...raw.sound },
       mouse,
       engine,
-      mappings: withPointerMapping(
+      mappings: withNewDefaults(
         Array.isArray(raw.mappings) && raw.mappings.length ? raw.mappings : defaults.mappings,
       ),
     }
@@ -43,14 +48,19 @@ export function loadConfig(): AppConfig {
 }
 
 /**
- * Give configs written before pointer control a Pinch→cursor mapping, without
- * touching anything the user set up. Skipped if Pinch is already mapped.
+ * Add mappings introduced after a config was written, without touching
+ * anything the user set up. Each is skipped if its gesture is already mapped.
  */
-function withPointerMapping(mappings: GestureMapping[]): GestureMapping[] {
-  const hasPointer = mappings.some((m) => m.action === 'mouse')
-  const hasPinch = mappings.some((m) => m.gesture === 'Pinch')
-  if (hasPointer || hasPinch) return mappings
-  return [...mappings, defaultPinchMouseMapping()]
+function withNewDefaults(mappings: GestureMapping[]): GestureMapping[] {
+  const result = [...mappings]
+  const claimed = (gesture: string) => result.some((m) => m.gesture === gesture)
+  if (!result.some((m) => m.action === 'mouse') && !claimed('Pinch')) {
+    result.push(defaultPinchMouseMapping())
+  }
+  if (!result.some((m) => m.action === 'sound') && !claimed('ILoveYou')) {
+    result.push(secretSoundMapping())
+  }
+  return result
 }
 
 export function saveConfig(config: AppConfig): void {

@@ -18,8 +18,9 @@ export interface Hotkey {
 /**
  * 'hotkey' presses a key combination once. 'mouse' takes over the cursor and
  * steers it from the acting hand's pinch point for as long as it is held.
+ * 'sound' plays a bundled audio file once.
  */
-export type MappingActionKind = 'hotkey' | 'mouse'
+export type MappingActionKind = 'hotkey' | 'mouse' | 'sound'
 
 export interface GestureMapping {
   id: string
@@ -28,6 +29,8 @@ export interface GestureMapping {
   action?: MappingActionKind
   /** Required for 'hotkey' actions, unused for 'mouse'. */
   hotkey?: Hotkey
+  /** Path under the renderer's public dir, for 'sound' actions. */
+  soundFile?: string
   enabled: boolean
   label?: string
   /** Per-mapping overrides; fall back to global engine settings when unset. */
@@ -148,6 +151,21 @@ export function defaultPinchMouseMapping(): GestureMapping {
   }
 }
 
+/**
+ * The web-shooter sign is the same shape as 🤟, which makes it the only
+ * reasonable home for this.
+ */
+export function secretSoundMapping(): GestureMapping {
+  return {
+    id: 'secret-spiderverse',
+    gesture: 'ILoveYou',
+    action: 'sound',
+    soundFile: 'sounds/miguel-ohara.mp3',
+    enabled: true,
+    label: '🕷️ Nah, I’d win',
+  }
+}
+
 /** Bumped when tuning defaults change in a way that should adopt the new values. */
 export const CONFIG_VERSION = 3
 
@@ -225,6 +243,7 @@ export function defaultConfig(): AppConfig {
         label: 'Switch app',
       },
       defaultPinchMouseMapping(),
+      secretSoundMapping(),
     ],
   }
 }

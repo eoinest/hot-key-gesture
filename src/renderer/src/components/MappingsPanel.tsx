@@ -105,10 +105,15 @@ export function MappingsPanel({
             >
               <option value="hotkey">⌨️</option>
               <option value="mouse">🖱️</option>
+              <option value="sound">🔊</option>
             </select>
             {(m.action ?? 'hotkey') === 'mouse' ? (
               <span className="mouse-action" title="The cursor follows this hand's pinch point while you hold it">
                 Move cursor
+              </span>
+            ) : m.action === 'sound' ? (
+              <span className="sound-action" title={m.soundFile ?? 'No sound file set'}>
+                {m.label ?? m.soundFile?.split('/').pop() ?? 'Play sound'}
               </span>
             ) : (
               <HotkeyRecorder
