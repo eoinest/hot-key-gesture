@@ -8,7 +8,7 @@ import type {
   MouseSettings,
   SoundSettings,
 } from '../../../shared/types'
-import { playBoop } from '../lib/sound'
+import { playArmed, playBoop } from '../lib/sound'
 
 interface SettingsPanelProps {
   engine: EngineSettings
@@ -209,6 +209,15 @@ export function SettingsPanel({
         onChange={(enabled) => {
           onSoundChange({ ...sound, enabled })
           if (enabled) playBoop(sound.volume)
+        }}
+      />
+      <ToggleRow
+        label="Chirp when armed"
+        hint="A soft rising tone the moment the guard arms, and a falling one when it drops — so you know you're ready without looking at this window."
+        checked={sound.armEnabled}
+        onChange={(armEnabled) => {
+          onSoundChange({ ...sound, armEnabled })
+          if (armEnabled && sound.enabled) playArmed(sound.volume)
         }}
       />
       <div className={`setting-row ${sound.enabled ? '' : 'setting-disabled'}`}>

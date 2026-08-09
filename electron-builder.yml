@@ -21,6 +21,9 @@ mac:
     NSCameraUsageDescription: HotKey Gesture uses your camera to recognize hand gestures. Video never leaves your device.
     NSAppleEventsUsageDescription: HotKey Gesture sends keystrokes via System Events when a gesture triggers a shortcut.
     NSCameraUseContinuityCameraDeviceType: true
+    # macOS App Nap would suspend our timers once the window is not visible,
+    # which stops gesture tracking while you work in another app.
+    NSAppSleepDisabled: true
   target:
     - target: dir
       arch: arm64

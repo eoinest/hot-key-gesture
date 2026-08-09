@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { GESTURE_INFO } from '../../shared/gestures'
 import { formatHotkey } from '../../shared/hotkeys'
-import type { AppConfig, AppMode, GestureMapping } from '../../shared/types'
+import { DEFAULT_SOUND_SETTINGS } from '../../shared/types'
+import type { AppConfig, AppMode, GestureMapping, SoundSettings } from '../../shared/types'
 import type { DisplayInfo } from '../../shared/api'
 import { ActivityPanel } from './components/ActivityPanel'
 import type { LogEntry } from './components/ActivityPanel'
@@ -9,7 +10,7 @@ import { CameraPanel } from './components/CameraPanel'
 import { GuidePanel } from './components/GuidePanel'
 import { MappingsPanel } from './components/MappingsPanel'
 import { SettingsPanel } from './components/SettingsPanel'
-import { playBoop, playClip, playErrorTone } from './lib/sound'
+import { playArmed, playBoop, playClip, playDisarmed, playErrorTone } from './lib/sound'
 import { useGesturePipeline } from './lib/useGesturePipeline'
 
 type Tab = 'gestures' | 'guide' | 'settings' | 'activity'
@@ -100,7 +101,7 @@ export default function App() {
     return () => navigator.mediaDevices.removeEventListener('devicechange', refreshDevices)
   }, [refreshDevices])
 
-  const soundRef = useRef({ enabled: true, volume: 0.3 })
+  const soundRef = useRef<SoundSettings>({ ...DEFAULT_SOUND_SETTINGS })
   useEffect(() => {
     if (config) soundRef.current = config.sound
   }, [config])
@@ -185,6 +186,22 @@ export default function App() {
     onClick: handleClick,
     onLog: addLog,
   })
+
+  // Announce the guard arming and dropping, so you can tell you're ready
+  // without looking away from whatever you're actually doing.
+  const wasArmed = useRef<boolean | null>(null)
+  const armed = pipeline.hud.armed
+  const currentMode = config?.mode
+  useEffect(() => {
+    const previous = wasArmed.current
+    wasArmed.current = armed
+    // Skip the very first reading so launching the app is silent.
+    if (previous === null || previous === armed) return
+    const { enabled, armEnabled, volume } = soundRef.current
+    if (!enabled || !armEnabled || currentMode === 'paused') return
+    if (armed) playArmed(volume)
+    else playDisarmed(volume)
+  }, [armed, currentMode])
 
   const setMode = (mode: AppMode) => {
     if (!config || config.mode === mode) return

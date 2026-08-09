@@ -90,11 +90,18 @@ export interface SoundSettings {
   enabled: boolean
   /** 0..1 */
   volume: number
+  /**
+   * Chirp when the safety guard arms, and again when it drops. The app is
+   * meant to be used while looking at something else, so this is the only way
+   * to know you are ready without turning back to the window.
+   */
+  armEnabled: boolean
 }
 
 export const DEFAULT_SOUND_SETTINGS: SoundSettings = {
   enabled: true,
   volume: 0.3,
+  armEnabled: true,
 }
 
 export interface MouseSettings {

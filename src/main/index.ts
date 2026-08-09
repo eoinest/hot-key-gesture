@@ -38,6 +38,13 @@ let lastSentAt = 0
 const CLICK_RATE_LIMIT_MS = 350
 let lastClickAt = 0
 
+// Belt and braces alongside webPreferences.backgroundThrottling: these cover
+// the renderer being backgrounded and the window being fully occluded, which
+// the per-window flag alone does not always prevent.
+app.commandLine.appendSwitch('disable-background-timer-throttling')
+app.commandLine.appendSwitch('disable-renderer-backgrounding')
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
+
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'app',
@@ -71,6 +78,10 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      // The whole point of this app is to keep tracking while you work in
+      // another window. Chromium would otherwise throttle the render loop once
+      // ours is occluded, which stops gesture detection dead.
+      backgroundThrottling: false,
     },
   })
 

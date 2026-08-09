@@ -50,6 +50,20 @@ export function playErrorTone(volume = 0.3): void {
   blip(volume * 0.9, 320, 180, 220, 'triangle')
 }
 
+/**
+ * Played when the safety guard arms. Deliberately lower and softer than the
+ * trigger boop so the two can't be confused: this one means "ready", the boop
+ * means "done".
+ */
+export function playArmed(volume = 0.3): void {
+  blip(volume * 0.55, 360, 520, 110, 'triangle')
+}
+
+/** The counterpart: a step back down when the guard drops. */
+export function playDisarmed(volume = 0.3): void {
+  blip(volume * 0.4, 460, 300, 100, 'triangle')
+}
+
 const clips = new Map<string, HTMLAudioElement>()
 
 /**

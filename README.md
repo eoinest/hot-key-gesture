@@ -26,8 +26,13 @@ hand tracking). No frames or data ever leave your machine.
   field, enable/disable rows, add/remove mappings. Tuning knobs for the arm gesture, hold
   time, repeat interval, confidence threshold, and smoothing. The guard can be switched off
   for one-handed use.
-- **Audible confirmation** — a short boop plays when a shortcut fires (and a duller tone if
-  it fails), so you know it worked without looking at the app. Toggle and volume in Settings.
+- **Audible confirmation** — a soft rising chirp when the safety guard arms and a falling one
+  when it drops, plus a brighter boop when a shortcut actually fires (and a duller tone if it
+  fails). The app is meant to be used while you look at something else, so all of it is
+  designed to be read by ear. Toggles and volume in Settings.
+- **Keeps working in the background** — the render loop is exempted from Chromium's
+  occluded-window throttling and macOS App Nap, so gestures still fire when the window is
+  behind whatever you're actually working in.
 - **Debug / tutorial viewer** — live preview with both hands skeleton-tracked and
   colour-coded by role (amber = arming, blue = acting), a hold-progress ring that fills and
   turns green on fire, an armed/not-armed banner, per-row "recognized" glow, a step-by-step
